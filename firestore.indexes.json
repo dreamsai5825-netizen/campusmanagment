@@ -1,0 +1,45 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "directMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fromId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "directMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "toId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leaveRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "collegeId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "principalMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "collegeId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reportIssues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "collegeId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,0 +1,25 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets (required for Firebase Admin on Cloud Run).
+env:
+  - variable: GOOGLE_CLOUD_PROJECT
+    value: cms-011
+    availability:
+      - RUNTIME
+  # Optional: if Application Default Credentials are not enough, add a Firebase service account secret.
+  # - variable: FIREBASE_SERVICE_ACCOUNT_JSON
+  #   secret: firebase-service-account
+  #   availability:
+  #     - RUNTIME
+
+  # Grant access to secrets in Cloud Secret Manager.
+  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+  # - variable: MY_SECRET
+  #   secret: mySecretRef

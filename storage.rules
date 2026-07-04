@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// TEMPORARY: Permissive rules for development so Principal Messages file uploads work.
+// Restrict to authenticated users (e.g. request.auth != null) before production.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /principal-messages/{fileName} {
+      allow read, write: if true;
+    }
+    // Direct chat messages between teacher and teacher/student/parent,
+    // including nested folders like "broadcast/...".
+    match /direct-messages/{allPaths=**} {
+      allow read, write: if true;
+    }
+    // Nested paths: profile-photos/principal/uid_timestamp.png
+    match /profile-photos/{allPaths=**} {
+      allow read, write: if true;
+    }
+    // Student assignment submissions (any file type)
+    match /assignment-submissions/{allPaths=**} {
+      allow read, write: if true;
+    }
+    // College branding logos
+    match /college-logos/{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
