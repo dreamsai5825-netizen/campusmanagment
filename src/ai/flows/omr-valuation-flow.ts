@@ -38,6 +38,56 @@ export async function valuateOMRSheet(input: {
   const randomSuffix = Math.floor(Math.random() * 100000);
   const runId = `${timestamp}_${randomSuffix}`;
   
+  // Check if Python Cloud Run Service URL is configured
+  const pythonServiceUrl = process.env.PYTHON_SERVICE_URL;
+  if (pythonServiceUrl) {
+    try {
+      console.log(`[OMR Valuation] Forwarding to Python service on Cloud Run: ${pythonServiceUrl}`);
+      
+      let fileBase64 = '';
+      let fileType = 'pdf';
+      if (input.base64Pdf) {
+        fileBase64 = input.base64Pdf;
+        fileType = 'pdf';
+      } else if (input.base64Image) {
+        fileBase64 = input.base64Image;
+        fileType = 'image';
+      } else {
+        throw new Error('Either base64Pdf or base64Image must be provided.');
+      }
+
+      const base64Data = fileBase64.replace(/^data:.*?;base64,/, '');
+      const fileBuffer = Buffer.from(base64Data, 'base64');
+      const fileBlob = new Blob([fileBuffer], { type: fileType === 'pdf' ? 'application/pdf' : 'image/png' });
+
+      const formData = new FormData();
+      formData.append('page', String(pageNumber));
+      formData.append('config', JSON.stringify({
+        subjects: input.subjects,
+        options: input.options,
+        rollNumberLength: input.rollNumberLength,
+      }));
+      formData.append('file', fileBlob, fileType === 'pdf' ? 'target_sheet.pdf' : 'target_sheet.png');
+      formData.append('fileType', fileType);
+
+      const response = await fetch(`${pythonServiceUrl.replace(/\/$/, '')}/api/omr/check`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Cloud Run OMR service failed: ${errText}`);
+      }
+
+      const result = await response.json();
+      return result as OMRValuationOutput;
+    } catch (err: any) {
+      console.error(`[OMR Valuation] Cloud Run forwarding failed:`, err);
+      throw err;
+    }
+  }
+
   const tempDir = path.join(process.cwd(), 'temp_run');
   await fs.mkdir(tempDir, { recursive: true });
   

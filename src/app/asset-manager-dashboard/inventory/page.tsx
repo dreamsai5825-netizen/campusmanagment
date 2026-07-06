@@ -101,6 +101,19 @@ export default function InventoryPage() {
   const [submittingEditDept, setSubmittingEditDept] = useState(false);
   const [submittingDeleteDept, setSubmittingDeleteDept] = useState(false);
 
+  // Dialog State: Edit & Delete Asset
+  const [isEditAssetOpen, setIsEditAssetOpen] = useState(false);
+  const [isDeleteAssetOpen, setIsDeleteAssetOpen] = useState(false);
+  const [assetToEdit, setAssetToEdit] = useState<Asset | null>(null);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [editAssetName, setEditAssetName] = useState('');
+  const [editAssetType, setEditAssetType] = useState('');
+  const [editAssetNumber, setEditAssetNumber] = useState('');
+  const [editCondition, setEditCondition] = useState<'Excellent' | 'Good' | 'Fair' | 'Needs Repair'>('Excellent');
+  const [editQuantity, setEditQuantity] = useState('1');
+  const [submittingEditAsset, setSubmittingEditAsset] = useState(false);
+  const [submittingDeleteAsset, setSubmittingDeleteAsset] = useState(false);
+
   // Load Departments
   useEffect(() => {
     if (!principal?.collegeId) return;
@@ -331,6 +344,85 @@ export default function InventoryPage() {
       });
     } finally {
       setSubmittingAsset(false);
+    }
+  };
+
+  // Edit Asset handler
+  const handleEditAsset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assetToEdit || !principal?.collegeId) return;
+    if (!editAssetName.trim() || !editAssetType.trim() || !editAssetNumber.trim() || !editQuantity) {
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'All fields are required.',
+      });
+      return;
+    }
+
+    const qtyNum = parseInt(editQuantity, 10);
+    if (isNaN(qtyNum) || qtyNum <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Quantity must be a positive integer.',
+      });
+      return;
+    }
+
+    setSubmittingEditAsset(true);
+    try {
+      await updateDoc(doc(db, 'assets', assetToEdit.id), {
+        assetName: editAssetName.trim(),
+        assetType: editAssetType.trim(),
+        assetNumber: editAssetNumber.trim(),
+        condition: editCondition,
+        quantity: qtyNum
+      });
+
+      toast({
+        title: 'Asset Updated',
+        description: `Successfully updated asset details for "${editAssetName}".`,
+      });
+
+      setIsEditAssetOpen(false);
+      setAssetToEdit(null);
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to update asset.',
+      });
+    } finally {
+      setSubmittingEditAsset(false);
+    }
+  };
+
+  // Delete Asset handler
+  const handleDeleteAsset = async () => {
+    if (!assetToDelete || !principal?.collegeId) return;
+
+    setSubmittingDeleteAsset(true);
+    try {
+      await deleteDoc(doc(db, 'assets', assetToDelete.id));
+
+      toast({
+        title: 'Asset Deleted',
+        description: `Successfully deleted "${assetToDelete.assetName}".`,
+      });
+
+      setIsDeleteAssetOpen(false);
+      setAssetToDelete(null);
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete asset.',
+      });
+    } finally {
+      setSubmittingDeleteAsset(false);
     }
   };
 
@@ -584,6 +676,7 @@ export default function InventoryPage() {
                         <th scope="col" className="px-6 py-3">Asset Number</th>
                         <th scope="col" className="px-6 py-3">Condition</th>
                         <th scope="col" className="px-6 py-3 text-center">Quantity</th>
+                        <th scope="col" className="px-6 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -603,6 +696,39 @@ export default function InventoryPage() {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center font-bold text-foreground">{asset.quantity}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-muted/80 rounded-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAssetToEdit(asset);
+                                  setEditAssetName(asset.assetName);
+                                  setEditAssetType(asset.assetType);
+                                  setEditAssetNumber(asset.assetNumber);
+                                  setEditCondition(asset.condition);
+                                  setEditQuantity(String(asset.quantity));
+                                  setIsEditAssetOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAssetToDelete(asset);
+                                  setIsDeleteAssetOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -684,6 +810,128 @@ export default function InventoryPage() {
               disabled={submittingDeleteDept}
             >
               {submittingDeleteDept ? 'Deleting...' : 'Delete Permanently'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Asset Dialog */}
+      <Dialog open={isEditAssetOpen} onOpenChange={setIsEditAssetOpen}>
+        <DialogContent className="max-w-md">
+          <form onSubmit={handleEditAsset}>
+            <DialogHeader>
+              <DialogTitle>Edit Asset Item</DialogTitle>
+              <DialogDescription>
+                Modify the catalog specifications of the asset.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Asset Name</label>
+                <Input 
+                  placeholder="e.g. Smartboard, Projector, Dell Laptop" 
+                  value={editAssetName}
+                  onChange={(e) => setEditAssetName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Asset Type (Text Box)</label>
+                <Input 
+                  placeholder="e.g. Electronics, Furniture, Laboratory" 
+                  value={editAssetType}
+                  onChange={(e) => setEditAssetType(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Asset Number / Barcode ID</label>
+                <Input 
+                  placeholder="e.g. LAB-PRJ-012, CS-LAP-224" 
+                  value={editAssetNumber}
+                  onChange={(e) => setEditAssetNumber(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Condition</label>
+                  <Select 
+                    value={editCondition} 
+                    onValueChange={(val: any) => setEditCondition(val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select condition..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Excellent">Excellent</SelectItem>
+                      <SelectItem value="Good">Good</SelectItem>
+                      <SelectItem value="Fair">Fair</SelectItem>
+                      <SelectItem value="Needs Repair">Needs Repair</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quantity</label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => {
+                setIsEditAssetOpen(false);
+                setAssetToEdit(null);
+              }} disabled={submittingEditAsset}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submittingEditAsset} className="bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90 text-white">
+                {submittingEditAsset ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Asset Dialog */}
+      <Dialog open={isDeleteAssetOpen} onOpenChange={setIsDeleteAssetOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Asset Item
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the asset item <strong>{assetToDelete?.assetName}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete this asset record from the department's catalog.
+            </p>
+            <p className="text-sm font-semibold text-destructive">
+              This action is irreversible.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => {
+              setIsDeleteAssetOpen(false);
+              setAssetToDelete(null);
+            }} disabled={submittingDeleteAsset}>
+              Cancel
+            </Button>
+            <Button 
+              type="button" 
+              variant="destructive"
+              onClick={handleDeleteAsset}
+              disabled={submittingDeleteAsset}
+            >
+              {submittingDeleteAsset ? 'Deleting...' : 'Delete Permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>

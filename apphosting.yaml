@@ -13,6 +13,10 @@ env:
     value: cms-011
     availability:
       - RUNTIME
+  - variable: PYTHON_SERVICE_URL
+    value: https://python-service-674639396653.us-central1.run.app
+    availability:
+      - RUNTIME
   # Optional: if Application Default Credentials are not enough, add a Firebase service account secret.
   # - variable: FIREBASE_SERVICE_ACCOUNT_JSON
   #   secret: firebase-service-account

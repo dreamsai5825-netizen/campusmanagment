@@ -14,13 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, getDocs, collection, query, where, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { uploadProfilePhoto, uploadCollegeLogo } from '@/lib/profile-photo';
 import { getCollegeById } from '@/lib/college-service';
 import type { College } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Building2, School } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -174,6 +174,163 @@ export default function AdminProfilePage() {
       setSaving(false);
     }
   };
+
+  // --- MULTI-COLLEGE CODE START ---
+  const [associatedColleges, setAssociatedColleges] = useState<College[]>([]);
+  const [loadingColleges, setLoadingColleges] = useState(false);
+  const [newCollegeId, setNewCollegeId] = useState('');
+  const [addingCollege, setAddingCollege] = useState(false);
+
+  useEffect(() => {
+    const fetchColleges = async () => {
+      const ids = principal?.collegeIds && principal.collegeIds.length > 0
+        ? principal.collegeIds
+        : principal?.collegeId
+        ? [principal.collegeId]
+        : [];
+      
+      if (ids.length === 0) {
+        setAssociatedColleges([]);
+        return;
+      }
+
+      setLoadingColleges(true);
+      try {
+        const fetched = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const col = await getCollegeById(id);
+              return col;
+            } catch (err) {
+              console.error(`Failed to fetch college ${id}:`, err);
+              return null;
+            }
+          })
+        );
+        setAssociatedColleges(fetched.filter((c): c is College => c !== null));
+      } catch (err) {
+        console.error('Error fetching associated colleges:', err);
+      } finally {
+        setLoadingColleges(false);
+      }
+    };
+
+    fetchColleges();
+  }, [principal?.collegeIds, principal?.collegeId]);
+
+  const handleAddOtherCollege = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!principal?.id || !principal.userCollection) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'User details not fully loaded.'
+      });
+      return;
+    }
+
+    const userInput = newCollegeId.trim();
+    if (!userInput) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Please enter a valid College ID or Code.'
+      });
+      return;
+    }
+
+    setAddingCollege(true);
+    try {
+      let targetId = userInput;
+      let collegeData: College | null = null;
+
+      // 1. Try to fetch by document ID
+      const colSnap = await getDoc(doc(db, 'colleges', userInput));
+      if (colSnap.exists()) {
+        collegeData = { id: colSnap.id, ...colSnap.data() } as College;
+      } else {
+        // 2. Try to query by unique college code (case-insensitive uppercase)
+        const codeQuery = await getDocs(
+          query(collection(db, 'colleges'), where('code', '==', userInput.toUpperCase()))
+        );
+        if (!codeQuery.empty) {
+          const docFound = codeQuery.docs[0];
+          targetId = docFound.id;
+          collegeData = { id: docFound.id, ...docFound.data() } as College;
+        }
+      }
+
+      if (!collegeData) {
+        toast({
+          variant: 'destructive',
+          title: 'Institution not found',
+          description: `No institution exists with ID or Code: "${userInput}"`
+        });
+        return;
+      }
+
+      const currentIds = principal.collegeIds && principal.collegeIds.length > 0
+        ? principal.collegeIds
+        : principal.collegeId
+        ? [principal.collegeId]
+        : [];
+      
+      if (currentIds.includes(targetId)) {
+        toast({
+          title: 'Already linked',
+          description: `"${collegeData.name}" is already associated with your account.`
+        });
+        setNewCollegeId('');
+        return;
+      }
+
+      // Add to list and switch active immediately
+      const userRef = doc(db, principal.userCollection, principal.id);
+      await updateDoc(userRef, {
+        collegeIds: arrayUnion(targetId),
+        collegeId: targetId
+      });
+
+      toast({
+        title: 'Institution Linked',
+        description: `Successfully linked "${collegeData.name}" and switched your dashboard.`
+      });
+      setNewCollegeId('');
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'Link failed',
+        description: 'Failed to link institution. Try again.'
+      });
+    } finally {
+      setAddingCollege(false);
+    }
+  };
+
+  const handleSwitchCollege = async (targetId: string) => {
+    if (!principal?.id || !principal.userCollection) return;
+    
+    try {
+      const userRef = doc(db, principal.userCollection, principal.id);
+      await updateDoc(userRef, {
+        collegeId: targetId
+      });
+      
+      toast({
+        title: 'Institution Switched',
+        description: 'Your dashboard has switched context to this institution.'
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'Switch failed',
+        description: 'Failed to change the active institution.'
+      });
+    }
+  };
+  // --- MULTI-COLLEGE CODE END ---
 
   if (!principal) return null;
 
@@ -422,6 +579,110 @@ export default function AdminProfilePage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Associated Institutions Panel */}
+      {principal?.userCollection === 'college_admins' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" /> Associated Institutions
+            </CardTitle>
+            <CardDescription>
+              Link your account to other institutions and switch the active context of your dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {loadingColleges ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {associatedColleges.map((colItem) => {
+                  const isActive = colItem.id === principal?.collegeId;
+                  return (
+                    <div
+                      key={colItem.id}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border transition-all ${
+                        isActive
+                          ? 'border-primary bg-primary/5 shadow-sm'
+                          : 'border-border bg-card hover:bg-muted/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 border rounded-md overflow-hidden flex items-center justify-center bg-muted/20 shrink-0">
+                          {colItem.logoUrl ? (
+                            <img
+                              src={colItem.logoUrl}
+                              alt={colItem.name}
+                              className="object-contain w-full h-full"
+                            />
+                          ) : (
+                            <School className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-foreground flex items-center gap-2">
+                            {colItem.name}
+                            {isActive && (
+                              <span className="inline-flex items-center text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                                Active
+                              </span>
+                            )}
+                          </h4>
+                          <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                            ID: {colItem.id} | Code: <span className="uppercase">{colItem.code}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {!isActive && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 sm:mt-0 shrink-0"
+                          onClick={() => handleSwitchCollege(colItem.id)}
+                        >
+                          Switch Context
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add College Form */}
+            <form onSubmit={handleAddOtherCollege} className="border-t pt-6 space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Add Another Institution</h3>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="new-college-id" className="sr-only">Institution ID or Code</Label>
+                  <Input
+                    id="new-college-id"
+                    placeholder="Enter College ID or Code (e.g. XLQB4T)"
+                    value={newCollegeId}
+                    onChange={(e) => setNewCollegeId(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" disabled={addingCollege} className="shrink-0">
+                  {addingCollege ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Linking…
+                    </>
+                  ) : (
+                    'Link Institution'
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Provide the exact database ID or Institution Code to link it to your profile.
+              </p>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

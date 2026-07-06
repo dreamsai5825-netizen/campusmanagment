@@ -60,9 +60,9 @@ function usePrincipalOrTeacherOrStudent(
   return data;
 }
 
-export function useCurrentPrincipal(): (Principal & { isSuperAdmin?: boolean }) | null {
+export function useCurrentPrincipal(): (Principal & { isSuperAdmin?: boolean; userCollection?: string; collegeIds?: string[] }) | null {
   const { superAdmin, selectedCollegeId, firebaseUser } = useAuth();
-  const [adminUser, setAdminUser] = useState<Principal | null>(null);
+  const [adminUser, setAdminUser] = useState<any | null>(null);
 
   useEffect(() => {
     if (superAdmin || !firebaseUser?.uid) {
@@ -90,7 +90,7 @@ export function useCurrentPrincipal(): (Principal & { isSuperAdmin?: boolean }) 
       if (matchedCollection) {
         unsub = onSnapshot(doc(db, matchedCollection, firebaseUser.uid), (snap) => {
           if (snap.exists()) {
-            setAdminUser({ id: snap.id, ...snap.data() } as Principal);
+            setAdminUser({ id: snap.id, userCollection: matchedCollection, ...snap.data() });
           } else {
             setAdminUser(null);
           }
@@ -105,7 +105,7 @@ export function useCurrentPrincipal(): (Principal & { isSuperAdmin?: boolean }) 
             const foundId = snap.docs[0].id;
             unsub = onSnapshot(doc(db, col, foundId), (s) => {
               if (s.exists()) {
-                setAdminUser({ id: s.id, ...s.data() } as Principal);
+                setAdminUser({ id: s.id, userCollection: col, ...s.data() });
               } else {
                 setAdminUser(null);
               }

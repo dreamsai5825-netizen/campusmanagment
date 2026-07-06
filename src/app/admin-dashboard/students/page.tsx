@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PlusCircle, KeyRound, Loader2, Users, BookOpen } from 'lucide-react';
+import { PlusCircle, KeyRound, Loader2, Users, BookOpen, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db, auth } from '@/lib/firebase';
 import { collection, onSnapshot, setDoc, doc, query, where } from 'firebase/firestore';
@@ -212,6 +212,13 @@ export default function StudentsPage() {
           >
             {isCreatingLogins ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
             Create student login
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(getPath('/students/import'))}
+            title="Import students from Excel/CSV"
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Import Students
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>

@@ -12,6 +12,25 @@ const execAsync = promisify(exec);
  */
 async function sendWhatsAppMessageServerSide(phoneNumber: string, message: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const pythonServiceUrl = process.env.PYTHON_SERVICE_URL;
+    if (pythonServiceUrl) {
+      try {
+        console.log(`[Broadcast Send] Forwarding to Python service on Cloud Run: ${pythonServiceUrl}`);
+        const response = await fetch(`${pythonServiceUrl.replace(/\/$/, '')}/api/whatsapp/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ phoneNumber, message })
+        });
+        const result = await response.json();
+        return result;
+      } catch (err: any) {
+        console.error(`[Broadcast Send] Cloud Run forwarding failed:`, err);
+        return { success: false, error: `Cloud Run forwarding failed: ${err.message}` };
+      }
+    }
+
     const scriptPath = path.join(process.cwd(), 'whatsapp_service.py');
     const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
     

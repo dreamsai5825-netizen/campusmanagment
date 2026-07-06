@@ -21,19 +21,45 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    const principalSnap = await adminDb.collection('principals').doc(uid).get();
     let collegeId: string | undefined;
+
+    // Check if principal snap exists
+    const principalSnap = await adminDb.collection('principals').doc(uid).get();
     if (principalSnap.exists) {
       collegeId = principalSnap.data()?.collegeId;
     } else {
-      const byEmail = await adminDb.collection('principals').where('email', '==', decoded.email ?? '').limit(1).get();
-      if (byEmail.empty) {
-        return NextResponse.json({ error: 'Forbidden: principal only' }, { status: 403 });
+      // Check if clerk snap exists
+      const clerkSnap = await adminDb.collection('clerks').doc(uid).get();
+      if (clerkSnap.exists) {
+        collegeId = clerkSnap.data()?.collegeId;
+      } else {
+        // Look up principal by email
+        const email = decoded.email ?? '';
+        const byEmailPrincipal = await adminDb
+          .collection('principals')
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        
+        if (!byEmailPrincipal.empty) {
+          collegeId = byEmailPrincipal.docs[0].data()?.collegeId;
+        } else {
+          // Look up clerk by email
+          const byEmailClerk = await adminDb
+            .collection('clerks')
+            .where('email', '==', email)
+            .limit(1)
+            .get();
+          
+          if (!byEmailClerk.empty) {
+            collegeId = byEmailClerk.docs[0].data()?.collegeId;
+          }
+        }
       }
-      collegeId = byEmail.docs[0].data()?.collegeId;
     }
+
     if (!collegeId) {
-      return NextResponse.json({ error: 'College not found for principal' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: principal or clerk only' }, { status: 403 });
     }
 
     const studentsSnap = await adminDb.collection('students').where('collegeId', '==', collegeId).get();

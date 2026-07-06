@@ -2,29 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin';
 import { DEFAULT_NEW_USER_PASSWORD } from '@/lib/default-user-password';
 
-async function verifyPrincipalCollege(token: string) {
+async function verifyPrincipalOrClerkCollege(token: string) {
   const adminAuth = getAdminAuth();
   const adminDb = getAdminFirestore();
   const decoded = await adminAuth.verifyIdToken(token);
   const uid = decoded.uid;
 
-  const principalSnap = await adminDb.collection('principals').doc(uid).get();
   let collegeId: string | undefined;
+
+  // Check if principal snap exists
+  const principalSnap = await adminDb.collection('principals').doc(uid).get();
   if (principalSnap.exists) {
     collegeId = principalSnap.data()?.collegeId;
   } else {
-    const byEmail = await adminDb
-      .collection('principals')
-      .where('email', '==', decoded.email ?? '')
-      .limit(1)
-      .get();
-    if (byEmail.empty) {
-      return { error: 'Forbidden: principal only' as const, status: 403 as const };
+    // Check if clerk snap exists
+    const clerkSnap = await adminDb.collection('clerks').doc(uid).get();
+    if (clerkSnap.exists) {
+      collegeId = clerkSnap.data()?.collegeId;
+    } else {
+      // Look up principal by email
+      const email = decoded.email ?? '';
+      const byEmailPrincipal = await adminDb
+        .collection('principals')
+        .where('email', '==', email)
+        .limit(1)
+        .get();
+      
+      if (!byEmailPrincipal.empty) {
+        collegeId = byEmailPrincipal.docs[0].data()?.collegeId;
+      } else {
+        // Look up clerk by email
+        const byEmailClerk = await adminDb
+          .collection('clerks')
+          .where('email', '==', email)
+          .limit(1)
+          .get();
+        
+        if (!byEmailClerk.empty) {
+          collegeId = byEmailClerk.docs[0].data()?.collegeId;
+        }
+      }
     }
-    collegeId = byEmail.docs[0].data()?.collegeId;
   }
+
   if (!collegeId) {
-    return { error: 'College not found for principal' as const, status: 403 as const };
+    return { error: 'Forbidden: principal or clerk only' as const, status: 403 as const };
   }
   return { adminAuth, adminDb, collegeId };
 }
@@ -43,7 +65,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    const principal = await verifyPrincipalCollege(token);
+    const principal = await verifyPrincipalOrClerkCollege(token);
     if ('error' in principal) {
       return NextResponse.json({ error: principal.error }, { status: principal.status });
     }

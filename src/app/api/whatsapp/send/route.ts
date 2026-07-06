@@ -20,6 +20,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if Python Cloud Run Service URL is configured
+    const pythonServiceUrl = process.env.PYTHON_SERVICE_URL;
+    if (pythonServiceUrl) {
+      try {
+        console.log(`[WhatsApp Send] Forwarding to Python service on Cloud Run: ${pythonServiceUrl}`);
+        const response = await fetch(`${pythonServiceUrl.replace(/\/$/, '')}/api/whatsapp/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ phoneNumber, message })
+        });
+        const result = await response.json();
+        return NextResponse.json(result);
+      } catch (err: any) {
+        console.error(`[WhatsApp Send] Cloud Run forwarding failed:`, err);
+        return NextResponse.json(
+          { success: false, error: `Cloud Run forwarding failed: ${err.message}` },
+          { status: 500 }
+        );
+      }
+    }
+
     console.log(`[WhatsApp Send] Attempting to send message to ${phoneNumber}`);
 
     // Get the path to the Python script
