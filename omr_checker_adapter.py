@@ -260,7 +260,7 @@ def main():
         field_blocks["Roll_No"] = {
             "fieldType": "QTYPE_INT",
             "origin": [105, 196],
-            "fieldLabels": [f"r1..{actual_roll_len}"],
+            "fieldLabels": [f"r1..{actual_roll_len}" if actual_roll_len > 1 else "r1"],
             "bubblesGap": 33,
             "labelsGap": 30
         }
@@ -289,7 +289,7 @@ def main():
             field_blocks[block_name] = {
                 "fieldType": f"QTYPE_MCQ{len(options)}",
                 "origin": [int(round(x_origin)), int(round(y_origin))],
-                "fieldLabels": [f"q{g_start_q}..{g_end_q}"],
+                "fieldLabels": [f"q{g_start_q}..{g_end_q}" if g_end_q > g_start_q else f"q{g_start_q}"],
                 "bubblesGap": int(round(bubbles_gap)),
                 "labelsGap": int(round(row_height))
             }
@@ -298,9 +298,9 @@ def main():
         "pageDimensions": [1191, 1684],
         "bubbleDimensions": [22, 22],
         "customLabels": {
-            "Roll": [f"r1..{actual_roll_len}"] if actual_roll_len > 0 else []
+            "Roll": [f"r1..{actual_roll_len}" if actual_roll_len > 1 else "r1"] if actual_roll_len > 0 else []
         },
-        "outputColumns": (["Roll"] if actual_roll_len > 0 else []) + [f"q1..{total_q_count}"],
+        "outputColumns": (["Roll"] if actual_roll_len > 0 else []) + ([f"q1..{total_q_count}"] if total_q_count > 1 else ([f"q1"] if total_q_count == 1 else [])),
         "fieldBlocks": field_blocks,
         "preProcessors": []
     }

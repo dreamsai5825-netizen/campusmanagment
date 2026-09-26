@@ -1398,10 +1398,10 @@ export default function OMRWorkspacePage() {
           }
         }
 
-        // Compress images at high crispness (1200px / 82%) to retain full legibility within Firestore limits.
-        const compressedPageImage = await compressBase64Image(pageImage, 1200, 0.82);
+        // Compress images to lightweight web format (~50KB each) to prevent Firestore write stream exhaustion.
+        const compressedPageImage = await compressBase64Image(pageImage, 800, 0.65);
         const compressedAnnotatedImage = result.scannedImage
-          ? await compressBase64Image(result.scannedImage, 1200, 0.82)
+          ? await compressBase64Image(result.scannedImage, 800, 0.65)
           : undefined;
 
         // Save result doc to Firestore with retry backoff
@@ -1427,9 +1427,8 @@ export default function OMRWorkspacePage() {
         await setDocWithRetry(doc(db, 'omr_results', resultId), resultDoc);
 
         // Inter-page cooldown: give Firestore write stream time to flush between pages.
-        // Without this, rapid sequential writes overwhelm the queue on large PDFs.
         if (p < pageCount) {
-          await new Promise(r => setTimeout(r, 400));
+          await new Promise(r => setTimeout(r, 600));
         }
       }
 
