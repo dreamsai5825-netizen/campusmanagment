@@ -86,6 +86,19 @@ async function getOMRMLDatasetSamples(limit = 60, offset = 0, category = 'all') 
   return await res.json();
 }
 
+async function saveOMRResults(results: OMRStudentResult[]) {
+  const res = await fetch('/api/omr/save-results', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ results }),
+  });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error || `Failed to save results (HTTP ${res.status})`);
+  }
+  return await res.json();
+}
+
 // UI components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1302,30 +1315,6 @@ export default function OMRWorkspacePage() {
         console.warn('Could not pre-fetch class list:', err);
       }
 
-      // Helper: write a Firestore document with exponential backoff retry.
-      // Prevents "Write stream exhausted" errors when Firestore throttles rapid writes.
-      const setDocWithRetry = async (ref: any, data: any, maxRetries = 4) => {
-        let delay = 600; // ms — start conservative
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-          try {
-            await setDoc(ref, data);
-            return;
-          } catch (err: any) {
-            const isExhausted =
-              err?.message?.includes('resource-exhausted') ||
-              err?.message?.includes('Write stream exhausted') ||
-              err?.code === 'resource-exhausted';
-            if (isExhausted && attempt < maxRetries) {
-              console.warn(`Firestore write throttled (attempt ${attempt + 1}/${maxRetries}). Retrying in ${delay}ms...`);
-              await new Promise(r => setTimeout(r, delay));
-              delay = Math.min(delay * 2, 8000); // exponential backoff, cap at 8s
-            } else {
-              throw err; // re-throw non-retriable or final attempt
-            }
-          }
-        }
-      };
-
       for (let p = 1; p <= pageCount; p++) {
         setCurrentProcessingPage(p);
         setValuationProgress(Math.round(((p - 1) / pageCount) * 100));
@@ -1404,7 +1393,7 @@ export default function OMRWorkspacePage() {
           ? await compressBase64Image(result.scannedImage, 800, 0.65)
           : undefined;
 
-        // Save result doc to Firestore with retry backoff
+        // Save result doc via server API route (bypasses browser Firestore write stream limits)
         const resultId = doc(collection(db, 'omr_results')).id;
         const resultDoc: OMRStudentResult = {
           id: resultId,
@@ -1424,12 +1413,7 @@ export default function OMRWorkspacePage() {
           parsedAnnotatedImage: compressedAnnotatedImage,
         };
 
-        await setDocWithRetry(doc(db, 'omr_results', resultId), resultDoc);
-
-        // Inter-page cooldown: give Firestore write stream time to flush between pages.
-        if (p < pageCount) {
-          await new Promise(r => setTimeout(r, 600));
-        }
+        await saveOMRResults([resultDoc]);
       }
 
       setValuationProgress(100);
