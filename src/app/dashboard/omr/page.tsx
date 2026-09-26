@@ -458,34 +458,38 @@ export default function OMRWorkspacePage() {
     setAppliedRotation(0);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const b64 = reader.result as string;
-        const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type.includes('pdf');
+      let b64 = '';
+      const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type.includes('pdf');
+      if (isPdf) {
+        try {
+          b64 = await convertPdfPageToImage(file, 1);
+        } catch {
+          b64 = await convertImageToBase64(file);
+        }
+      } else {
+        b64 = await convertImageToBase64(file);
+      }
 
-        const subList = selectedExam
-          ? selectedExam.subjects
-          : subjectsConfig.map((s: { name: string; questionCount: number }) => ({ name: s.name, questionCount: s.questionCount }));
-        const optList = selectedExam ? selectedExam.options : answerOptions.split(',').map(s => s.trim());
-        const rLen = rollNumberLength;
+      const subList = selectedExam
+        ? selectedExam.subjects
+        : subjectsConfig.map((s: { name: string; questionCount: number }) => ({ name: s.name, questionCount: s.questionCount }));
+      const optList = selectedExam ? selectedExam.options : answerOptions.split(',').map(s => s.trim());
+      const rLen = rollNumberLength;
 
-        const valRes = await valuateOMRSheet({
-          base64Pdf: isPdf ? b64 : undefined,
-          base64Image: !isPdf ? b64 : undefined,
-          pageNumber: 1,
-          subjects: subList,
-          options: optList,
-          rollNumberLength: rLen,
-        });
+      const valRes = await valuateOMRSheet({
+        base64Image: b64,
+        pageNumber: 1,
+        subjects: subList,
+        options: optList,
+        rollNumberLength: rLen,
+      });
 
-        setMlEvaluatorResults(valRes);
-        setIsMLScanning(false);
-        toast({
-          title: "OMR Sheet Parsed via PyTorch Engine",
-          description: "Inspect the detected answers below and correct any misclassified bubbles.",
-        });
-      };
-      reader.readAsDataURL(file);
+      setMlEvaluatorResults(valRes);
+      setIsMLScanning(false);
+      toast({
+        title: "OMR Sheet Parsed via PyTorch Engine",
+        description: "Inspect the detected answers below and correct any misclassified bubbles.",
+      });
     } catch (err: any) {
       setIsMLScanning(false);
       toast({
@@ -505,30 +509,35 @@ export default function OMRWorkspacePage() {
     setIsMLScanning(true);
     setMlUserCorrections({});
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const b64 = reader.result as string;
-        const isPdf = mlEvaluatorFile.name.toLowerCase().endsWith('.pdf') || mlEvaluatorFile.type.includes('pdf');
-        const subList = selectedExam
-          ? selectedExam.subjects
-          : subjectsConfig.map((s: { name: string; questionCount: number }) => ({ name: s.name, questionCount: s.questionCount }));
-        const optList = selectedExam ? selectedExam.options : answerOptions.split(',').map(s => s.trim());
-        const rLen = rollNumberLength;
-        const valRes = await valuateOMRSheet({
-          base64Pdf: isPdf ? b64 : undefined,
-          base64Image: !isPdf ? b64 : undefined,
-          pageNumber: 1,
-          subjects: subList,
-          options: optList,
-          rollNumberLength: rLen,
-          rotationAngle: angleToApply,
-        });
-        setMlEvaluatorResults(valRes);
-        setAppliedRotation(angleToApply);
-        setIsMLScanning(false);
-        toast({ title: 'Re-parsed with rotation', description: `Applied ${angleToApply > 0 ? '+' : ''}${angleToApply}° manual rotation.` });
-      };
-      reader.readAsDataURL(mlEvaluatorFile);
+      let b64 = '';
+      const isPdf = mlEvaluatorFile.name.toLowerCase().endsWith('.pdf') || mlEvaluatorFile.type.includes('pdf');
+      if (isPdf) {
+        try {
+          b64 = await convertPdfPageToImage(mlEvaluatorFile, 1);
+        } catch {
+          b64 = await convertImageToBase64(mlEvaluatorFile);
+        }
+      } else {
+        b64 = await convertImageToBase64(mlEvaluatorFile);
+      }
+
+      const subList = selectedExam
+        ? selectedExam.subjects
+        : subjectsConfig.map((s: { name: string; questionCount: number }) => ({ name: s.name, questionCount: s.questionCount }));
+      const optList = selectedExam ? selectedExam.options : answerOptions.split(',').map(s => s.trim());
+      const rLen = rollNumberLength;
+      const valRes = await valuateOMRSheet({
+        base64Image: b64,
+        pageNumber: 1,
+        subjects: subList,
+        options: optList,
+        rollNumberLength: rLen,
+        rotationAngle: angleToApply,
+      });
+      setMlEvaluatorResults(valRes);
+      setAppliedRotation(angleToApply);
+      setIsMLScanning(false);
+      toast({ title: 'Re-parsed with rotation', description: `Applied ${angleToApply > 0 ? '+' : ''}${angleToApply}° manual rotation.` });
     } catch (err: any) {
       setIsMLScanning(false);
       toast({ title: 'Re-parse Failed', description: err.message || 'Failed to re-scan sheet.', variant: 'destructive' });
@@ -853,17 +862,14 @@ export default function OMRWorkspacePage() {
     setKeyUploadLoading(true);
     try {
       let base64Image = '';
-      let base64Pdf = '';
       let isPdf = false;
       if (file.type === 'application/pdf') {
         isPdf = true;
-        // Read the raw PDF bytes for high-quality 300 DPI server-side processing
-        base64Pdf = await convertImageToBase64(file);
-        // Also render a client-side preview (lower quality, for fallback display only)
         try {
           base64Image = await convertPdfPageToImage(file, 1);
         } catch (e) {
           console.warn('Failed to render client preview image:', e);
+          base64Image = await convertImageToBase64(file);
         }
       } else if (file.type.startsWith('image/')) {
         base64Image = await convertImageToBase64(file);
@@ -889,14 +895,9 @@ export default function OMRWorkspacePage() {
         ? selectedExam.rollNumberLength
         : rollNumberLength;
 
-      // BUG FIX: Always pass base64Pdf when the file is a PDF (same as ML Trainer section).
-      // Previously, if client-side preview rendered successfully, base64Pdf was never sent —
-      // the adapter would receive only a degraded ~87 DPI JPEG instead of the full-quality
-      // 300 DPI server-side render, causing inaccurate bubble detection on the key sheet.
       const parsed = await valuateOMRSheet({
-        base64Pdf: isPdf ? base64Pdf : undefined,
-        base64Image: !isPdf ? base64Image : undefined,
-        pageNumber: isPdf ? 1 : undefined,
+        base64Image,
+        pageNumber: 1,
         subjects: subjectsObj,
         options,
         rollNumberLength: rNumLen,
@@ -904,9 +905,7 @@ export default function OMRWorkspacePage() {
 
       const normalized = normalizeAnswersCasing(parsed.answers, subjectsObj);
       setDetectedKeyAnswers(normalized);
-      // BUG FIX: Show the processed/annotated image returned by the Python adapter
-      // (deskewed + corner-warped) instead of the raw client-side preview image.
-      // Fall back to client preview only if the adapter didn't return a scanned image.
+      // Show the processed/annotated image returned by the Python adapter
       setUploadedKeySheetUrl(parsed.scannedImage || base64Image || null);
       setKeyEditMode(true);
 
@@ -1331,13 +1330,13 @@ export default function OMRWorkspacePage() {
         setCurrentProcessingPage(p);
         setValuationProgress(Math.round(((p - 1) / pageCount) * 100));
 
-        // Render page to image (kept for Firestore student preview display)
+        // Render page to image (kept for valuation & Firestore student preview display)
         const pageImage = await convertPdfPageToImage(file, p);
 
-        // Pass the raw PDF + page number so the Python adapter renders at 300 DPI server-side.
+        // Pass the rendered page image directly — keeps request payload ~300KB instead of sending entire multi-page PDF
         const result = await valuateOMRSheet({
-          base64Pdf: base64Pdf,
-          pageNumber: p,
+          base64Image: pageImage,
+          pageNumber: 1,
           subjects: selectedExam.subjects,
           options,
           rollNumberLength: rollLen,
