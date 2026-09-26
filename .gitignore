@@ -40,6 +40,16 @@ next-env.d.ts
 .genkit/*
 #.env*
 
+# python & temp
+__pycache__/
+*.pyc
+.temp/
+temp_run/
+scratch/
+.venv/
+.omr_ml_dataset/
+.omr_ml_model/
+
 # firebase
 firebase-debug.log
 firestore-debug.log

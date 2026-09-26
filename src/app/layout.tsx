@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/auth-context';
+import { ThemeProvider } from '@/contexts/theme-context';
 import { InstallPrompt } from '@/components/install-prompt';
 
 export const metadata: Metadata = {
@@ -38,12 +39,36 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
           rel="stylesheet"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('theme_preset') || 'default';
+                  var html = document.documentElement;
+                  html.classList.remove('dark', 'theme-white', 'theme-simple-dark', 'theme-glass-dark');
+                  if (theme === 'theme-simple-dark') {
+                    html.classList.add('dark', 'theme-simple-dark');
+                  } else if (theme === 'theme-glass-dark') {
+                    html.classList.add('dark', 'theme-glass-dark');
+                  } else if (theme === 'theme-white') {
+                    html.classList.add('theme-white');
+                  } else {
+                    html.classList.add('theme-default');
+                  }
+                } catch (e) {}
+              })();
+            `
+          }}
+        />
       </head>
       <body className="font-body antialiased">
         <AuthProvider>
-          {children}
-          <Toaster />
-          <InstallPrompt />
+          <ThemeProvider>
+            {children}
+            <Toaster />
+            <InstallPrompt />
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

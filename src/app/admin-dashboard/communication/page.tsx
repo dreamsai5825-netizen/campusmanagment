@@ -32,10 +32,12 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
+import { useChatScroll } from '@/hooks/use-chat-scroll';
 import type { LeaveRequest, PrincipalMessage, ReportIssue, Teacher } from '@/lib/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { EmojiPicker } from '@/components/emoji-picker';
+import { approveLeaveRequest, rejectLeaveRequest } from '@/lib/leave-service';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -246,22 +248,28 @@ export default function AdminCommunicationPage() {
   };
 
   const handleApproveLeave = async (id: string) => {
+    const req = leaveRequests.find((r) => r.id === id);
+    if (!req) return;
     try {
-      await updateDoc(doc(db, 'leaveRequests', id), { status: 'approved' });
+      const res = await approveLeaveRequest(req, principal?.name || 'Principal');
       setSelectedLeave(null);
-      toast({ title: 'Leave request approved' });
-    } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update request.' });
+      toast({ title: 'Leave request approved', description: res.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update request.';
+      toast({ variant: 'destructive', title: 'Error', description: msg });
     }
   };
 
   const handleRejectLeave = async (id: string) => {
+    const req = leaveRequests.find((r) => r.id === id);
+    if (!req) return;
     try {
-      await updateDoc(doc(db, 'leaveRequests', id), { status: 'rejected' });
+      const res = await rejectLeaveRequest(req, principal?.name || 'Principal');
       setSelectedLeave(null);
-      toast({ title: 'Leave request rejected' });
-    } catch {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update request.' });
+      toast({ title: 'Leave request rejected', description: res.message });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update request.';
+      toast({ variant: 'destructive', title: 'Error', description: msg });
     }
   };
 
@@ -287,7 +295,6 @@ export default function AdminCommunicationPage() {
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
   const principalChatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -329,9 +336,7 @@ export default function AdminCommunicationPage() {
     }
   };
 
-  useEffect(() => {
-    chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [threadMessages]);
+  const { ref: chatScrollRef } = useChatScroll([threadMessages, selectedConversation?.id]);
 
   const handleSendMessage = async () => {
     if (!principal || !selectedConversation) return;
@@ -594,10 +599,15 @@ export default function AdminCommunicationPage() {
                           <AvatarFallback>{req.senderName.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-semibold">{req.senderName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{req.senderName}</p>
+                            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                              {req.leaveType || 'Casual Leave (CL)'}
+                            </Badge>
+                          </div>
                           <p className="text-sm text-muted-foreground">{req.subject}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatDate(req.startDate)} – {formatDate(req.endDate)}
+                            {formatDate(req.startDate)} – {formatDate(req.endDate)} ({req.duration ?? (req.isHalfDay ? 0.5 : 1.0)}d)
                           </p>
                         </div>
                       </div>
@@ -848,6 +858,17 @@ export default function AdminCommunicationPage() {
           {selectedLeave && (
             <div className="grid gap-4 py-4">
               <div>
+                <p className="text-sm font-medium text-muted-foreground">Leave Type</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                    {selectedLeave.leaveType || 'Casual Leave (CL)'}
+                  </Badge>
+                  {selectedLeave.isHalfDay && (
+                    <span className="text-xs text-muted-foreground">({selectedLeave.halfDaySession || 'Half Day'})</span>
+                  )}
+                </div>
+              </div>
+              <div>
                 <p className="text-sm font-medium text-muted-foreground">Subject</p>
                 <p>{selectedLeave.subject}</p>
               </div>
@@ -857,8 +878,8 @@ export default function AdminCommunicationPage() {
                   <p>{formatDate(selectedLeave.startDate)}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">End Date</p>
-                  <p>{formatDate(selectedLeave.endDate)}</p>
+                  <p className="text-sm font-medium text-muted-foreground">End Date & Total</p>
+                  <p>{formatDate(selectedLeave.endDate)} ({selectedLeave.duration ?? (selectedLeave.isHalfDay ? 0.5 : 1.0)}d)</p>
                 </div>
               </div>
               <div>

@@ -83,6 +83,99 @@ html, body {
     --sidebar-border: 217 20% 18%;
     --sidebar-ring: 217 91% 60%;
   }
+
+  .theme-white {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 20% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 221.2 83.2% 53.3%;
+  }
+
+  .theme-simple-dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 240 5% 84.9%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 240 4.9% 83.9%;
+  }
+
+  .theme-glass-dark {
+    --background: 222 47% 4%;
+    --foreground: 210 20% 98%;
+    --card: 222 40% 9%;
+    --card-foreground: 210 20% 98%;
+    --popover: 222 40% 9%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 20% 12%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 217 20% 12%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 173 50% 35%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62% 35%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 217 20% 15% / 0.4;
+    --input: 217 20% 15% / 0.4;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 45% 6%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 0 0% 0% / 0;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 217 20% 15% / 0.4;
+    --sidebar-ring: 217 91% 60%;
+  }
 }
 
 @layer base {
@@ -100,11 +193,250 @@ html, body {
     overflow-x: hidden;
     min-width: 0;
   }
-  body.dark {
+  body.dark, .dark body {
     background: linear-gradient(160deg, hsl(222 47% 6%) 0%, hsl(222 40% 8%) 50%, hsl(222 47% 6%) 100%);
     background-attachment: fixed;
   }
+
+  .theme-white body {
+    background: #f8fafc !important;
+    background-attachment: fixed !important;
+  }
+
+  .theme-simple-dark body {
+    background: #09090b !important;
+    background-attachment: fixed !important;
+  }
+
+  .theme-glass-dark body {
+    background:
+      radial-gradient(circle at top right, #123a75 0%, transparent 30%),
+      radial-gradient(circle at bottom left, #08152f 0%, transparent 35%),
+      #050914 !important;
+    background-attachment: fixed !important;
+  }
 }
+
+  /* Cyber Glass Cards - From User Demo */
+  .theme-glass-dark .bg-card,
+  .theme-glass-dark .card,
+  .theme-glass-dark [class*="bg-card"],
+  .theme-glass-dark [class*="border-primary/20"] {
+    position: relative !important;
+    overflow: hidden !important;
+    padding: 24px !important;
+    border-radius: 26px !important;
+    /* Main card color + top-right glowing backdrop */
+    background: radial-gradient(circle at 100% 0%, rgba(0, 170, 255, 0.25) 0%, transparent 70%),
+                linear-gradient(145deg, rgba(30, 45, 90, 0.55), rgba(8, 15, 30, 0.55)) !important;
+    backdrop-filter: blur(18px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+    border: 1px solid transparent !important; /* Managed by pseudo-element mask */
+    box-shadow:
+      inset 0 2px 2px rgba(255, 255, 255, 0.15),
+      inset 0 -10px 18px rgba(0, 0, 0, 0.45),
+      0 15px 40px rgba(0, 0, 0, 0.45),
+      0 0 25px rgba(0, 180, 255, 0.12) !important;
+    
+    transform-style: preserve-3d !important;
+    perspective: 1000px !important;
+    /* CSS transitions for mouse leave return */
+    transition: transform 0.5s ease, box-shadow 0.3s ease !important;
+  }
+
+  /* Card Gradient Border using Mask */
+  .theme-glass-dark .bg-card::before,
+  .theme-glass-dark .card::before,
+  .theme-glass-dark [class*="bg-card"]::before,
+  .theme-glass-dark [class*="border-primary/20"]::before {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    border-radius: 26px !important;
+    padding: 2px !important;
+    background: linear-gradient(135deg, #fff, #5ed9ff, #0b74ff, transparent) !important;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0) !important;
+    -webkit-mask-composite: xor !important;
+    mask-composite: exclude !important;
+    pointer-events: none !important;
+    z-index: 5 !important;
+  }
+
+  /* Shine sweep overlay on hover */
+  .theme-glass-dark .bg-card::after,
+  .theme-glass-dark .card::after,
+  .theme-glass-dark [class*="bg-card"]::after,
+  .theme-glass-dark [class*="border-primary/20"]::after {
+    content: "" !important;
+    position: absolute !important;
+    left: -100% !important;
+    top: 0 !important;
+    width: 60% !important;
+    height: 100% !important;
+    background: linear-gradient(110deg, transparent, rgba(255, 255, 255, 0.25), transparent) !important;
+    transform: skewX(-20deg) !important;
+    transition: left 0.8s ease-in-out !important;
+    pointer-events: none !important;
+    z-index: 10 !important;
+  }
+
+  .theme-glass-dark .bg-card:hover::after,
+  .theme-glass-dark .card:hover::after,
+  .theme-glass-dark [class*="bg-card"]:hover::after,
+  .theme-glass-dark [class*="border-primary/20"]:hover::after {
+    left: 180% !important;
+  }
+
+  /* Floating Volumetric Glass Sidebar */
+  .theme-glass-dark [data-sidebar="sidebar"] {
+    background: radial-gradient(circle at 100% 0%, rgba(0, 170, 255, 0.2) 0%, transparent 70%),
+                linear-gradient(180deg, rgba(6, 10, 26, 0.7) 0%, rgba(4, 6, 15, 0.85) 100%) padding-box,
+                linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(59, 130, 246, 0.15) 100%) border-box !important;
+    border-right: 2px solid transparent !important;
+    backdrop-filter: blur(24px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+    box-shadow: 8px 0 35px rgba(0, 0, 0, 0.7),
+                inset 0 3px 6px rgba(255, 255, 255, 0.15) !important;
+  }
+
+  /* Exclude sidebar from any card masks, shine sweeps, or pseudo-elements */
+  .theme-glass-dark [data-sidebar="sidebar"] .bg-card,
+  .theme-glass-dark [data-sidebar="sidebar"] .card,
+  .theme-glass-dark [data-sidebar="sidebar"] [class*="bg-card"],
+  .theme-glass-dark [data-sidebar="sidebar"] [class*="border-primary/20"] {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: initial !important;
+    border-radius: initial !important;
+    transform: none !important;
+  }
+
+  .theme-glass-dark [data-sidebar="sidebar"] *::before,
+  .theme-glass-dark [data-sidebar="sidebar"] *::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* Sidebar Inner Borders/License Container */
+  .theme-glass-dark [data-sidebar="sidebar"] [class*="border"] {
+    position: relative !important;
+    background: linear-gradient(135deg, rgba(8, 12, 30, 0.6) 0%, rgba(4, 6, 15, 0.75) 100%) padding-box,
+                linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%) border-box !important;
+    border: 1px solid transparent !important;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.12),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* Active Sidebar Navigation Item - clean steady active state (no change on hover) */
+  .theme-glass-dark [data-sidebar="sidebar"] [data-active="true"],
+  .theme-glass-dark [data-sidebar="sidebar"] [data-active="true"]:hover,
+  .theme-glass-dark [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"],
+  .theme-glass-dark [data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active="true"]:hover,
+  .theme-glass-dark [data-sidebar="menu-button"][data-active="true"],
+  .theme-glass-dark [data-sidebar="menu-button"][data-active="true"]:hover {
+    background: radial-gradient(circle at 100% 0%, rgba(0, 170, 255, 0.25) 0%, transparent 70%),
+                linear-gradient(145deg, rgba(30, 45, 90, 0.55), rgba(8, 15, 30, 0.55)) !important;
+    color: #38bdf8 !important; 
+    border: 1px solid rgba(120, 220, 255, 0.35) !important;
+    box-shadow: 0 0 20px rgba(0, 180, 255, 0.25),
+                inset 0 2px 2px rgba(255, 255, 255, 0.15) !important;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.4) !important;
+    transform: none !important;
+  }
+
+  /* Completely disable ALL hover effects on the side navbar in Glass Dark theme */
+  .theme-glass-dark [data-sidebar="sidebar"] *:hover,
+  .theme-glass-dark [data-sidebar="sidebar"] [data-sidebar="menu-button"]:hover,
+  .theme-glass-dark [data-sidebar="sidebar"] button:hover,
+  .theme-glass-dark [data-sidebar="sidebar"] a:hover,
+  .theme-glass-dark [data-sidebar="sidebar"] li:hover,
+  .theme-glass-dark [data-sidebar="sidebar"] [class*="hover:"]:hover,
+  .theme-glass-dark [data-sidebar="menu-button"]:hover {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+
+  /* Inactive sidebar buttons: completely silent on hover - no background, no border, no shadow, no movement */
+  .theme-glass-dark [data-sidebar="sidebar"] [data-sidebar="menu-button"]:not([data-active="true"]),
+  .theme-glass-dark [data-sidebar="sidebar"] [data-sidebar="menu-button"]:not([data-active="true"]):hover,
+  .theme-glass-dark [data-sidebar="sidebar"] button:not([data-active="true"]):hover,
+  .theme-glass-dark [data-sidebar="sidebar"] a:not([data-active="true"]):hover,
+  .theme-glass-dark [data-sidebar="sidebar"] [class*="hover:bg-sidebar-accent"]:not([data-active="true"]):hover,
+  .theme-glass-dark [data-sidebar="menu-button"]:not([data-active="true"]):hover {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: 1px solid transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    color: #cbd5e1 !important;
+    transform: none !important;
+  }
+
+  /* Dashboard Headers & Sub-select Controls */
+  .theme-glass-dark select,
+  .theme-glass-dark button[id*="academic-year"],
+  .theme-glass-dark button[id*="college"] {
+    background: linear-gradient(145deg, rgba(30, 45, 90, 0.4), rgba(8, 15, 30, 0.4)) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(120, 220, 255, 0.25) !important;
+    color: #f1f5f9 !important;
+    box-shadow: 0 0 12px rgba(0, 180, 255, 0.15) !important;
+  }
+
+  /* Glowing Icon Containers Inside Cards */
+  .theme-glass-dark .bg-primary\/10,
+  .theme-glass-dark [class*="bg-primary/10"],
+  .theme-glass-dark [class*="bg-violet-500/10"],
+  .theme-glass-dark [class*="bg-emerald-500/10"] {
+    background: linear-gradient(145deg, #1747a8, #0b1738) !important;
+    border: 1px solid rgba(120, 220, 255, 0.4) !important;
+    box-shadow: 0 0 25px rgba(0, 180, 255, 0.4) !important;
+  }
+
+  /* Glowing Icons */
+  .theme-glass-dark .text-primary,
+  .theme-glass-dark [class*="text-primary"],
+  .theme-glass-dark [class*="text-violet-500"],
+  .theme-glass-dark [class*="text-emerald-500"] {
+    color: #38bdf8 !important; 
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.5)) !important;
+  }
+
+  /* Crisp Typography and Subtle Text Shadow */
+  .theme-glass-dark h1,
+  .theme-glass-dark h2,
+  .theme-glass-dark h3,
+  .theme-glass-dark [class*="font-headline"] {
+    color: #ffffff !important;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.08) !important;
+  }
+
+  /* Card Titles & Values Mapping */
+  .theme-glass-dark .text-sm.font-medium,
+  .theme-glass-dark .title {
+    color: #d9e8ff !important;
+  }
+
+  .theme-glass-dark .text-2xl.font-bold,
+  .theme-glass-dark .value {
+    color: #ffffff !important;
+    text-shadow: 0 0 20px #20bfff !important;
+  }
+
+  .theme-glass-dark .text-muted-foreground,
+  .theme-glass-dark .small {
+    color: #8fb3df !important;
+  }
 
 /* Attendance 3D cube buttons - From Uiverse.io by Mike11jr (adapted) */
 .attendance-cube-scene {

@@ -55,8 +55,9 @@ import { collection, onSnapshot, addDoc, query, where, getDocs, doc, updateDoc, 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useCurrentTeacher, useCurrentPrincipal } from '@/hooks/use-current-user';
+import { useChatScroll } from '@/hooks/use-chat-scroll';
 import { useToast } from '@/hooks/use-toast';
-import type { Parent, Student, Teacher, Class, LeaveRequest, PrincipalMessage, DirectMessage, ReportIssue } from '@/lib/types';
+import type { Parent, Student, Teacher, Class, PrincipalMessage, DirectMessage, ReportIssue } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { playNotificationSound } from '@/lib/notification-sound';
 import { EmojiPicker } from '@/components/emoji-picker';
@@ -85,16 +86,10 @@ export default function CommunicationPage() {
   const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [assignedClassIds, setAssignedClassIds] = useState<string[]>([]);
-  const [leaveSubject, setLeaveSubject] = useState('');
-  const [leaveStartDate, setLeaveStartDate] = useState('');
-  const [leaveEndDate, setLeaveEndDate] = useState('');
-  const [leaveReason, setLeaveReason] = useState('');
-  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
   const [issueTitle, setIssueTitle] = useState('');
   const [issueContent, setIssueContent] = useState('');
   const [issueSubmitting, setIssueSubmitting] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
-  const [myLeaveRequests, setMyLeaveRequests] = useState<LeaveRequest[]>([]);
   const [myReportIssues, setMyReportIssues] = useState<ReportIssue[]>([]);
 
   useEffect(() => {
@@ -171,20 +166,6 @@ export default function CommunicationPage() {
     return () => unsub();
   }, [teacher?.id]);
 
-  useEffect(() => {
-    if (!teacher?.id || !teacher?.collegeId) {
-      setMyLeaveRequests([]);
-      return;
-    }
-    const q = query(collection(db, 'leaveRequests'), where('collegeId', '==', teacher.collegeId));
-    const unsub = onSnapshot(q, (snap) => {
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as LeaveRequest));
-      const mine = all.filter((r) => r.senderId === teacher.id);
-      mine.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      setMyLeaveRequests(mine);
-    });
-    return () => unsub();
-  }, [teacher?.id, teacher?.collegeId]);
 
   useEffect(() => {
     if (!teacher?.id || !teacher?.collegeId) {
@@ -213,7 +194,6 @@ export default function CommunicationPage() {
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
   const principalChatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -285,9 +265,7 @@ export default function CommunicationPage() {
     return principalMessages.filter((m) => m.toId === teacher.id && !m.read).length;
   }, [principalMessages, teacher?.id]);
 
-  useEffect(() => {
-    chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [threadWithPrincipal]);
+  const { ref: chatScrollRef } = useChatScroll([threadWithPrincipal]);
 
   const handleSendMessageToPrincipalChat = async () => {
     if (!teacher?.id || !teacher?.collegeId) {
@@ -452,7 +430,6 @@ export default function CommunicationPage() {
   const [directChatSending, setDirectChatSending] = useState(false);
   const [pendingDirectAttachment, setPendingDirectAttachment] = useState<File | null>(null);
   const [cameraForDirect, setCameraForDirect] = useState(false);
-  const directChatScrollRef = useRef<HTMLDivElement>(null);
   const directChatTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Common message to students (broadcast)
@@ -600,9 +577,7 @@ export default function CommunicationPage() {
     }
   };
 
-  useEffect(() => {
-    directChatScrollRef.current?.scrollTo({ top: directChatScrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [threadDirect]);
+  const { ref: directChatScrollRef } = useChatScroll([threadDirect, selectedDirectConversation?.id]);
 
   const handleSendDirectMessage = async () => {
     if (!teacher || !selectedDirectConversation) return;
@@ -807,68 +782,6 @@ export default function CommunicationPage() {
     }
   };
 
-  const handleSubmitLeaveRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!teacher || !leaveSubject.trim() || !leaveStartDate || !leaveEndDate || !leaveReason.trim()) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all fields.' });
-      return;
-    }
-    if (!teacher.collegeId || !teacher.id) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Your profile is missing college info. Please refresh or contact admin.' });
-      return;
-    }
-    if (leaveStartDate > leaveEndDate) {
-      toast({ variant: 'destructive', title: 'Error', description: 'End date must be after start date.' });
-      return;
-    }
-    setLeaveSubmitting(true);
-    try {
-      await addDoc(collection(db, 'leaveRequests'), {
-        collegeId: teacher.collegeId,
-        senderId: teacher.id,
-        senderName: teacher.name ?? 'Teacher',
-        senderType: 'teacher',
-        subject: leaveSubject.trim(),
-        startDate: leaveStartDate,
-        endDate: leaveEndDate,
-        reason: leaveReason.trim(),
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      });
-      if (principal?.id) {
-        await addDoc(collection(db, 'notifications'), {
-          collegeId: teacher.collegeId,
-          recipientId: principal.id,
-          type: 'message',
-          sender: { name: teacher.name ?? 'Teacher', role: 'teacher' },
-          title: `New leave request from ${teacher.name ?? 'Teacher'}`,
-          content: leaveSubject.trim(),
-          date: new Date().toISOString(),
-          read: false,
-        });
-
-        // Send WhatsApp notification
-        const { sendNotificationViaWhatsApp } = await import('@/lib/whatsapp-notification');
-        sendNotificationViaWhatsApp(
-          principal.id,
-          `New leave request from ${teacher.name ?? 'Teacher'}`,
-          `Subject: ${leaveSubject.trim()}\nDates: ${leaveStartDate} to ${leaveEndDate}\nReason: ${leaveReason.trim()}`,
-          'teacher'
-        ).catch(err => console.error('WhatsApp notification failed:', err));
-      }
-      setLeaveSubject('');
-      setLeaveStartDate('');
-      setLeaveEndDate('');
-      setLeaveReason('');
-      toast({ title: 'Leave request submitted' });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to submit leave request.';
-      console.error('Leave request submit error:', err);
-      toast({ variant: 'destructive', title: 'Error', description: message });
-    } finally {
-      setLeaveSubmitting(false);
-    }
-  };
 
   const handleReportIssue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -972,68 +885,52 @@ export default function CommunicationPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 md:grid-cols-3">
-              <Dialog>
+              <Dialog open={issueDialogOpen} onOpenChange={setIssueDialogOpen}>
                 <DialogTrigger asChild>
                   <Card className="cursor-pointer hover:shadow-lg transition-shadow">
                     <CardHeader className="items-center text-center">
-                      <FileText className="h-8 w-8 text-primary" />
-                      <CardTitle className="text-lg mt-2">
-                        Send Leave Request
+                      <ShieldAlert className="h-8 w-8 text-destructive" />
+                      <CardTitle className="text-lg mt-2 text-destructive">
+                        Report an Issue
                       </CardTitle>
                     </CardHeader>
                   </Card>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
-                  <form onSubmit={handleSubmitLeaveRequest}>
+                  <form onSubmit={handleReportIssue}>
                     <DialogHeader>
-                      <DialogTitle>Leave Request</DialogTitle>
+                      <DialogTitle>Report an Issue</DialogTitle>
                       <DialogDescription>
-                        Fill out the form to request leave. The principal will review it.
+                        Report will be received by the principal in Communication.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="leave-subject">Subject</Label>
+                        <Label htmlFor="issue-title">Title</Label>
                         <Input
-                          id="leave-subject"
-                          placeholder="e.g., Family event"
-                          value={leaveSubject}
-                          onChange={(e) => setLeaveSubject(e.target.value)}
+                          id="issue-title"
+                          placeholder="Brief title for the issue"
+                          value={issueTitle}
+                          onChange={(e) => setIssueTitle(e.target.value)}
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="start-date">Start Date</Label>
-                          <Input
-                            id="start-date"
-                            type="date"
-                            value={leaveStartDate}
-                            onChange={(e) => setLeaveStartDate(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="end-date">End Date</Label>
-                          <Input
-                            id="end-date"
-                            type="date"
-                            value={leaveEndDate}
-                            onChange={(e) => setLeaveEndDate(e.target.value)}
-                          />
-                        </div>
-                      </div>
                       <div className="space-y-2">
-                        <Label htmlFor="reason">Reason</Label>
+                        <Label htmlFor="issue-content">Details</Label>
                         <Textarea
-                          id="reason"
-                          placeholder="Please provide a brief reason for your leave."
-                          value={leaveReason}
-                          onChange={(e) => setLeaveReason(e.target.value)}
+                          id="issue-content"
+                          placeholder="Describe the issue..."
+                          rows={4}
+                          value={issueContent}
+                          onChange={(e) => setIssueContent(e.target.value)}
                         />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button type="submit" disabled={leaveSubmitting}>
-                        {leaveSubmitting ? 'Submitting…' : 'Submit Request'}
+                      <Button type="button" variant="outline" onClick={() => setIssueDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={issueSubmitting}>
+                        {issueSubmitting ? 'Submitting…' : 'Submit'}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -1215,104 +1112,7 @@ export default function CommunicationPage() {
                   </div>
                 </CardContent>
               </Card>
-              <Dialog open={issueDialogOpen} onOpenChange={setIssueDialogOpen}>
-                <DialogTrigger asChild>
-                  <Card className="cursor-pointer hover:shadow-lg transition-shadow">
-                    <CardHeader className="items-center text-center">
-                      <ShieldAlert className="h-8 w-8 text-destructive" />
-                      <CardTitle className="text-lg mt-2 text-destructive">
-                        Report an Issue
-                      </CardTitle>
-                    </CardHeader>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <form onSubmit={handleReportIssue}>
-                    <DialogHeader>
-                      <DialogTitle>Report an Issue</DialogTitle>
-                      <DialogDescription>
-                        Report will be received by the principal in Communication.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="issue-title">Title</Label>
-                        <Input
-                          id="issue-title"
-                          placeholder="Brief title for the issue"
-                          value={issueTitle}
-                          onChange={(e) => setIssueTitle(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="issue-content">Details</Label>
-                        <Textarea
-                          id="issue-content"
-                          placeholder="Describe the issue..."
-                          rows={4}
-                          value={issueContent}
-                          onChange={(e) => setIssueContent(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setIssueDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={issueSubmitting}>
-                        {issueSubmitting ? 'Submitting…' : 'Submit'}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
             </CardContent>
-            {teacher && (
-              <CardContent className="border-t pt-6">
-                <CardTitle className="text-lg mb-3">My Leave Requests</CardTitle>
-                <CardDescription className="mb-4">
-                  Status of your submitted leave requests.
-                </CardDescription>
-                {myLeaveRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No leave requests yet.</p>
-                ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table className="min-w-[320px]">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Subject</TableHead>
-                          <TableHead>Start – End</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {myLeaveRequests.map((req) => (
-                          <TableRow key={req.id}>
-                            <TableCell className="font-medium">{req.subject}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  req.status === 'approved'
-                                    ? 'default'
-                                    : req.status === 'rejected'
-                                    ? 'destructive'
-                                    : 'secondary'
-                                }
-                              >
-                                {req.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            )}
             {teacher && (
               <CardContent className="border-t pt-6">
                 <CardTitle className="text-lg mb-3">My Report Issues</CardTitle>

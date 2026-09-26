@@ -18,6 +18,7 @@ import {
   MessageSquare,
   CheckSquare,
   NotebookText,
+  UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -136,6 +137,7 @@ export default function DashboardPage() {
     { title: 'Timetable', value: 'View Schedule', icon: Calendar, href: '/dashboard/timetable', color: 'accent' },
     { title: 'Announcements', value: `${announcements.length} Recent`, icon: Megaphone, href: '/dashboard/announcements', color: 'primary' },
     { title: 'Communication', value: 'Connect', icon: MessageSquare, href: '/dashboard/parent-communication', color: 'chart-2' },
+    { title: 'My Profile', value: 'View & Edit', icon: UserCheck, href: '/dashboard/profile', color: 'chart-3' },
   ];
   
   const NotificationPopover = (

@@ -17,6 +17,9 @@ interface GeneratorConfig {
   additionalInstructions?: string;
   collegeName?: string;
   collegeLogoBase64?: string;
+  collegeLogo2Base64?: string;
+  collegeCode?: string;
+  collegeAddress?: string;
 }
 
 export interface OMRStudentResultExcel {
@@ -24,6 +27,7 @@ export interface OMRStudentResultExcel {
   studentName?: string;
   studentClass?: string;
   studentSection?: string;
+  answers?: Record<string, Record<string, string>>;
   score: number;
   correctCount: number;
   incorrectCount: number;
@@ -32,23 +36,172 @@ export interface OMRStudentResultExcel {
   evaluatedAt: string;
 }
 
-export function exportOMRResultsToExcel(results: OMRStudentResultExcel[], testName: string) {
-  const rows = results.map((r, idx) => ({
-    'Sl. No.': idx + 1,
-    'Roll Number': r.rollNumber || 'N/A',
-    'Candidate Name': r.studentName || 'N/A',
-    'Class': r.studentClass || 'N/A',
-    'Section': r.studentSection || 'N/A',
-    'Correct Answers': r.correctCount,
-    'Incorrect Answers': r.incorrectCount,
-    'Unattempted': r.unattemptedCount,
-    'Score Obtained': r.score,
-    'Max Score': r.maxScore,
-    'Percentage': ((r.score / r.maxScore) * 100).toFixed(2) + '%',
-    'Evaluation Date': new Date(r.evaluatedAt).toLocaleDateString(),
-  }));
+export interface OMRExamConfigForExcel {
+  subjects?: { name: string; questionCount: number }[];
+  keyAnswers?: Record<string, Record<string, string>>;
+  correctMarks?: number;
+  negativeMarks?: number;
+}
+
+function getKeyForSubject(mapObj: Record<string, any> | undefined | null, targetName: string): Record<string, any> {
+  if (!mapObj) return {};
+  if (mapObj[targetName]) return mapObj[targetName];
+
+  const targetNorm = targetName.trim().toLowerCase();
+  const foundKey = Object.keys(mapObj).find((k) => k.trim().toLowerCase() === targetNorm);
+  return foundKey ? mapObj[foundKey] : {};
+}
+
+export function exportOMRResultsToExcel(
+  results: OMRStudentResultExcel[],
+  testName: string,
+  examConfig?: OMRExamConfigForExcel | null
+) {
+  // Sort results by Roll Number numerically / alphanumerically
+  const sortedResults = [...results].sort((a, b) => {
+    const rollA = (a.rollNumber || '').trim();
+    const rollB = (b.rollNumber || '').trim();
+    const numA = parseInt(rollA, 10);
+    const numB = parseInt(rollB, 10);
+    if (!isNaN(numA) && !isNaN(numB) && String(numA) === rollA && String(numB) === rollB) {
+      return numA - numB;
+    }
+    return rollA.localeCompare(rollB, undefined, { numeric: true, sensitivity: 'base' });
+  });
+
+  // Extract subject configuration from examConfig or fallback to unique subject names in results
+  let subjects: { name: string; questionCount: number }[] = [];
+  if (examConfig?.subjects && examConfig.subjects.length > 0) {
+    subjects = examConfig.subjects;
+  } else {
+    const subjectNameSet = new Set<string>();
+    sortedResults.forEach((r) => {
+      if (r.answers) {
+        Object.keys(r.answers).forEach((sName) => subjectNameSet.add(sName));
+      }
+    });
+    subjects = Array.from(subjectNameSet).map((name) => ({ name, questionCount: 25 }));
+  }
+
+  const corrM = examConfig?.correctMarks ?? 1;
+  const negM = examConfig?.negativeMarks ?? 0;
+  const keyAnswers = examConfig?.keyAnswers;
+
+  const rows = sortedResults.map((r, idx) => {
+    const row: Record<string, any> = {
+      'Sl. No.': idx + 1,
+      'Roll Number': r.rollNumber || 'N/A',
+      'Candidate Name': r.studentName || 'N/A',
+      'Class': r.studentClass || 'N/A',
+      'Section': r.studentSection || 'N/A',
+    };
+
+    // Calculate & add subject-wise score columns using exact subject names created in OMR setup
+    subjects.forEach((subj) => {
+      const subjectHeaderName = subj.name.toUpperCase();
+      let subjectScore = 0;
+
+      if (r.answers) {
+        const studObj = getKeyForSubject(r.answers, subj.name);
+
+        if (keyAnswers) {
+          const keyObj = getKeyForSubject(keyAnswers, subj.name);
+          let subCorrect = 0;
+          let subIncorrect = 0;
+
+          for (let q = 1; q <= subj.questionCount; q++) {
+            const correctOpt = (keyObj[String(q)] || keyObj[String(q).padStart(3, '0')] || '').trim().toUpperCase();
+            const studentOpt = (studObj[String(q)] || studObj[String(q).padStart(3, '0')] || '').trim().toUpperCase();
+
+            if (!correctOpt) continue;
+
+            if (studentOpt === correctOpt) {
+              subCorrect++;
+            } else if (studentOpt) {
+              subIncorrect++;
+            }
+          }
+          subjectScore = (subCorrect * corrM) - (subIncorrect * negM);
+        }
+      }
+
+      row[subjectHeaderName] = subjectScore;
+    });
+
+    // Total and summary metrics columns
+    row['Total Score'] = r.score;
+    row['Max Score'] = r.maxScore;
+    row['Percentage'] = r.maxScore > 0 ? ((r.score / r.maxScore) * 100).toFixed(2) + '%' : '0%';
+    row['Total Correct'] = r.correctCount;
+    row['Total Incorrect'] = r.incorrectCount;
+    row['Unattempted'] = r.unattemptedCount;
+    row['Evaluation Date'] = r.evaluatedAt ? new Date(r.evaluatedAt).toLocaleDateString() : 'N/A';
+
+    return row;
+  });
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
+
+  // Auto-calculate column widths for clean readability in Excel
+  if (rows.length > 0) {
+    const keys = Object.keys(rows[0]);
+    const colWidths = keys.map((key) => {
+      const maxLen = Math.max(
+        key.length,
+        ...rows.map((r) => String(r[key] ?? '').length)
+      );
+      return { wch: Math.max(maxLen + 4, 12) };
+    });
+    worksheet['!cols'] = colWidths;
+  }
+
+  // Calculate summary statistics
+  const totalSheets = sortedResults.length;
+  const totalScoreSum = sortedResults.reduce((acc, curr) => acc + (curr.score || 0), 0);
+  const avgScore = totalSheets > 0 ? (totalScoreSum / totalSheets).toFixed(2) : '0';
+
+  let highestMarkStr = 'N/A';
+  let lowestMarkStr = 'N/A';
+
+  if (totalSheets > 0) {
+    const maxScore = Math.max(...sortedResults.map((r) => r.score));
+    const minScore = Math.min(...sortedResults.map((r) => r.score));
+
+    const topStudents = sortedResults.filter((r) => r.score === maxScore);
+    const topDetails = topStudents
+      .map((s) => `${s.studentName || 'Unknown'} (Roll: ${s.rollNumber || 'N/A'})`)
+      .join(', ');
+    highestMarkStr = `${maxScore} [Student: ${topDetails}]`;
+
+    const lowStudents = sortedResults.filter((r) => r.score === minScore);
+    const lowDetails = lowStudents
+      .map((s) => `${s.studentName || 'Unknown'} (Roll: ${s.rollNumber || 'N/A'})`)
+      .join(', ');
+    lowestMarkStr = `${minScore} [Student: ${lowDetails}]`;
+  }
+
+  const summaryRows: any[][] = [
+    [],
+    ['Valuation Summary & Statistics'],
+    ['Sheets Evaluated', totalSheets],
+    ['Class Average Total Score', avgScore],
+  ];
+
+  // Include subject-wise class averages in summary statistics
+  subjects.forEach((subj) => {
+    const subjectHeaderName = subj.name.toUpperCase();
+    const subScoresSum = rows.reduce((acc, row) => acc + (row[subjectHeaderName] || 0), 0);
+    const subAvg = totalSheets > 0 ? (subScoresSum / totalSheets).toFixed(2) : '0';
+    summaryRows.push([`Average ${subjectHeaderName} Score`, subAvg]);
+  });
+
+  summaryRows.push(
+    ['Highest Total Mark', highestMarkStr],
+    ['Lowest Total Mark', lowestMarkStr]
+  );
+
+  XLSX.utils.sheet_add_aoa(worksheet, summaryRows, { origin: -1 });
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
 
@@ -113,19 +266,21 @@ export function generateOMRPdf(config: GeneratorConfig): jsPDF {
   const totalCols = columnGrid.length;
   const totalPages = Math.max(1, Math.ceil(totalCols / COL_COUNT));
 
-  // Draws template page structure (borders, title, anchor marks)
+  // Draws template page structure (outer margin anchor marks, inner borders, title)
   const drawPageTemplate = (pdf: jsPDF, pageNum: number) => {
-    // 1. Draw 4 Solid Black Anchor Timing Marks at Corners (Required for OCR alignment)
+    // 1. Draw 4 Solid Black Anchor Timing Marks (Centered at 16.037mm -> 91px in 1191x1684 canvas)
+    const anchorSize = 4.5;
+    const anchorOffset = 16.037 - anchorSize / 2; // 13.787mm
     pdf.setFillColor(BLACK[0], BLACK[1], BLACK[2]);
-    pdf.rect(6, 6, 4, 4, 'F'); // Top Left
-    pdf.rect(PAGE_WIDTH - 6 - 4, 6, 4, 4, 'F'); // Top Right
-    pdf.rect(6, PAGE_HEIGHT - 6 - 4, 4, 4, 'F'); // Bottom Left
-    pdf.rect(PAGE_WIDTH - 6 - 4, PAGE_HEIGHT - 6 - 4, 4, 4, 'F'); // Bottom Right
+    pdf.rect(anchorOffset, anchorOffset, anchorSize, anchorSize, 'F'); // Top Left
+    pdf.rect(PAGE_WIDTH - anchorOffset - anchorSize, anchorOffset, anchorSize, anchorSize, 'F'); // Top Right
+    pdf.rect(anchorOffset, PAGE_HEIGHT - anchorOffset - anchorSize, anchorSize, anchorSize, 'F'); // Bottom Left
+    pdf.rect(PAGE_WIDTH - anchorOffset - anchorSize, PAGE_HEIGHT - anchorOffset - anchorSize, anchorSize, anchorSize, 'F'); // Bottom Right
 
-    // 2. Draw Page Borders
+    // 2. Draw Main Outer Page Framing Rectangle (Encloses content at 9.5mm with clean margin, eliminating box overlaps)
     pdf.setDrawColor(OMR_COLOR[0], OMR_COLOR[1], OMR_COLOR[2]);
-    pdf.setLineWidth(0.25);
-    pdf.rect(MARGIN_LEFT, 12, PRINT_WIDTH, PAGE_HEIGHT - 24, 'S');
+    pdf.setLineWidth(0.3);
+    pdf.rect(9.5, 9.5, PAGE_WIDTH - 19, PAGE_HEIGHT - 19, 'S');
 
     // 3. Draw Header Title Block (Only for page 2 and higher - page 1 has layout header)
     if (pageNum > 1) {
@@ -204,32 +359,65 @@ export function generateOMRPdf(config: GeneratorConfig): jsPDF {
     }
 
     // 2. CENTER COLUMN: Header + Instructions + Details
-    if (config.collegeName) {
-      const logoSize = 10;
-      const logoX = midColX + 2;
-      const logoY = yCursor - 6.5;
+    const institutionTitle = (config.collegeName || '').trim();
+    const hasLogo1 = !!config.collegeLogoBase64;
+    const hasLogo2 = !!config.collegeLogo2Base64;
 
-      if (config.collegeLogoBase64) {
-        try {
-          pdf.addImage(config.collegeLogoBase64, 'PNG', logoX, logoY, logoSize, logoSize);
-        } catch (err) {
-          console.error('Error drawing college logo to PDF:', err);
+    const renderPdfImage = (imgBase64: string, x: number, y: number, w: number, h: number) => {
+      try {
+        let fmt = 'PNG';
+        if (imgBase64.startsWith('data:image/jpeg') || imgBase64.startsWith('data:image/jpg')) {
+          fmt = 'JPEG';
+        } else if (imgBase64.startsWith('data:image/webp')) {
+          fmt = 'WEBP';
         }
+        pdf.addImage(imgBase64, fmt, x, y, w, h);
+      } catch (err) {
+        try {
+          (pdf as any).addImage(imgBase64, x, y, w, h);
+        } catch (e) {
+          console.error('Error drawing college logo to PDF:', e);
+        }
+      }
+    };
 
-        const textStartX = logoX + logoSize + 4;
+    if (institutionTitle) {
+      const logoSize = 11;
+      const logoY = yCursor - 7;
+
+      if (hasLogo1 && hasLogo2) {
+        // Dual logos: Logo 1 on left, Logo 2 on right, text centered
+        renderPdfImage(config.collegeLogoBase64!, midColX + 1, logoY, logoSize, logoSize);
+        renderPdfImage(config.collegeLogo2Base64!, midColX + midColWidth - logoSize - 1, logoY, logoSize, logoSize);
+
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(11);
         pdf.setTextColor(TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2]);
-        pdf.text(config.collegeName.toUpperCase(), textStartX, yCursor - 2);
+        pdf.text(institutionTitle.toUpperCase(), midColX + midColWidth / 2, yCursor - 2, { align: 'center' });
+
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(OMR_COLOR[0], OMR_COLOR[1], OMR_COLOR[2]);
+        pdf.text(`${config.testName.toUpperCase()} - OMR ANSWER SHEET`, midColX + midColWidth / 2, yCursor + 3.5, { align: 'center' });
+      } else if (hasLogo1) {
+        // Single logo on left
+        const logoX = midColX + 1;
+        renderPdfImage(config.collegeLogoBase64!, logoX, logoY, logoSize, logoSize);
+
+        const textStartX = logoX + logoSize + 3;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2]);
+        pdf.text(institutionTitle.toUpperCase(), textStartX, yCursor - 2);
 
         pdf.setFontSize(8.5);
         pdf.setTextColor(OMR_COLOR[0], OMR_COLOR[1], OMR_COLOR[2]);
         pdf.text(`${config.testName.toUpperCase()} - OMR ANSWER SHEET`, textStartX, yCursor + 3.5);
       } else {
+        // Text only centered
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(12);
+        pdf.setFontSize(12.5);
         pdf.setTextColor(TEXT_COLOR[0], TEXT_COLOR[1], TEXT_COLOR[2]);
-        pdf.text(config.collegeName.toUpperCase(), midColX + midColWidth / 2, yCursor - 2, { align: 'center' });
+        pdf.text(institutionTitle.toUpperCase(), midColX + midColWidth / 2, yCursor - 2, { align: 'center' });
 
         pdf.setFontSize(9);
         pdf.setTextColor(OMR_COLOR[0], OMR_COLOR[1], OMR_COLOR[2]);

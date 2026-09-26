@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, FileClock, Calendar, User, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { approveLeaveRequest, rejectLeaveRequest } from '@/lib/leave-service';
 
 export default function SuperAdminCollegeLeaveRequestsPage() {
   const params = useParams();
@@ -59,12 +60,22 @@ export default function SuperAdminCollegeLeaveRequestsPage() {
   }, [collegeId]);
 
   const handleUpdateStatus = async (id: string, status: 'approved' | 'rejected') => {
+    const req = leaveRequests.find((r) => r.id === id);
+    if (!req) return;
     try {
-      await updateDoc(doc(db, 'leaveRequests', id), { status });
-      toast({
-        title: 'Status Updated',
-        description: `Leave request has been ${status}.`,
-      });
+      if (status === 'approved') {
+        const res = await approveLeaveRequest(req, 'Super Admin');
+        toast({
+          title: 'Leave Approved',
+          description: res.message,
+        });
+      } else {
+        const res = await rejectLeaveRequest(req, 'Super Admin');
+        toast({
+          title: 'Leave Rejected',
+          description: res.message,
+        });
+      }
     } catch (err) {
       console.error('Error updating leave request status:', err);
       toast({
@@ -140,8 +151,16 @@ export default function SuperAdminCollegeLeaveRequestsPage() {
               <CardContent className="space-y-4 pt-4">
                 <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground bg-muted/30 p-3 rounded-xl border">
                   <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 text-xs font-semibold">
+                      {request.leaveType || 'Casual Leave (CL)'}
+                    </Badge>
+                    {request.isHalfDay && (
+                      <span className="text-xs text-muted-foreground font-medium">({request.halfDaySession || 'Half Day'})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 border-l pl-4">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>Duration: {request.startDate} to {request.endDate}</span>
+                    <span>Duration: {request.startDate} to {request.endDate} ({request.duration ?? (request.isHalfDay ? 0.5 : 1.0)}d)</span>
                   </div>
                   {request.createdAt && (
                     <div className="flex items-center gap-1.5 border-l pl-4">

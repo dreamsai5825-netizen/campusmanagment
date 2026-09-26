@@ -74,7 +74,7 @@ export function useCurrentPrincipal(): (Principal & { isSuperAdmin?: boolean; us
     let unsub: (() => void) | null = null;
 
     (async () => {
-      const collectionsToCheck = ['principals', 'college_admins', 'clerks', 'asset_managers'] as const;
+      const collectionsToCheck = ['principals', 'college_admins', 'clerks', 'asset_managers', 'account_managers'] as const;
       let matchedCollection: typeof collectionsToCheck[number] | null = null;
 
       for (const col of collectionsToCheck) {

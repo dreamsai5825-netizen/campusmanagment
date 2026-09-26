@@ -27,10 +27,11 @@ import { useToast } from '@/hooks/use-toast';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { createCollege, getCollegeByCode } from '@/lib/college-service';
+import { createCollege, getCollegeByCode, getInstitutionByCode } from '@/lib/college-service';
+import { generateInstitutionCode } from '@/lib/college-utils';
 import { getDashboardPath } from '@/lib/auth-role';
 
-type Role = 'principal' | 'teacher' | 'student' | 'college-admin' | 'clerk' | 'asset-manager';
+type Role = 'principal' | 'teacher' | 'student' | 'college-admin' | 'clerk' | 'asset-manager' | 'account-manager';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -45,13 +46,14 @@ export default function SignUpPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
 
-  // Principal: create college
+  // Principal / System Admin: create college / institution
   const [collegeName, setCollegeName] = useState('');
   const [principalHasCode, setPrincipalHasCode] = useState<'yes' | 'no'>('no');
   const [principalCode, setPrincipalCode] = useState('');
   const [adminAction, setAdminAction] = useState<'create' | 'join'>('create');
+  const [parentInstitutionCodeInput, setParentInstitutionCodeInput] = useState('');
 
-  // Teacher / Student: join by code
+  // Teacher / Student / Staff: join by college code
   const [collegeCode, setCollegeCode] = useState('');
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -76,22 +78,22 @@ export default function SignUpPage() {
     if (role === 'principal' || role === 'college-admin') {
       if (adminAction === 'create') {
         if (!collegeName.trim()) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Please enter institution name.' });
+          toast({ variant: 'destructive', title: 'Error', description: role === 'college-admin' ? 'Please enter institution name.' : 'Please enter college name.' });
           return;
         }
         if (principalHasCode === 'yes' && !principalCode.trim()) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Please enter DICE / institution code.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'Please enter official college / DICE code.' });
           return;
         }
       } else {
         if (!collegeCode.trim()) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Please enter your institution code.' });
+          toast({ variant: 'destructive', title: 'Error', description: 'Please enter the college code.' });
           return;
         }
       }
     } else {
       if (!collegeCode.trim()) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Please enter your institution code.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Please enter the college code.' });
         return;
       }
     }
@@ -103,35 +105,74 @@ export default function SignUpPage() {
 
       let collegeId: string;
 
-      if ((role === 'principal' || role === 'college-admin') && adminAction === 'create') {
+      if (role === 'college-admin' && adminAction === 'create') {
+        // System Admin (Institution Head)
+        const instCode = generateInstitutionCode();
         const college = await createCollege({
           name: collegeName.trim(),
           code: principalHasCode === 'yes' ? principalCode.trim() : undefined,
           generateCodeIfPrivate: principalHasCode === 'no',
+          institutionId: uid,
+          institutionCode: instCode,
+          institutionName: collegeName.trim(),
         });
         collegeId = college.id;
-        
-        const colCollection = role === 'principal' ? 'principals' : 'college_admins';
-        await setDoc(doc(db, colCollection, uid), {
+
+        await setDoc(doc(db, 'college_admins', uid), {
           name: name.trim(),
           email: email.trim(),
           collegeId,
+          collegeIds: [collegeId],
+          institutionCode: instCode,
+          institutionName: collegeName.trim(),
         });
+
         toast({
-          title: 'Account created',
-          description: principalHasCode === 'no'
-            ? `Your institution code is: ${college.code}. Share this with teachers and students.`
-            : undefined,
+          title: 'System Admin Account Created',
+          description: `Your Institution Code is: ${instCode}. Share this with Principals so they can connect their colleges.`,
+        });
+      } else if (role === 'principal' && adminAction === 'create') {
+        // Principal (College Head)
+        let parentInst: any = null;
+        if (parentInstitutionCodeInput.trim()) {
+          parentInst = await getInstitutionByCode(parentInstitutionCodeInput.trim());
+        }
+
+        const college = await createCollege({
+          name: collegeName.trim(),
+          code: principalHasCode === 'yes' ? principalCode.trim() : undefined,
+          generateCodeIfPrivate: principalHasCode === 'no',
+          ...(parentInst ? {
+            institutionId: parentInst.id,
+            institutionCode: parentInst.institutionCode,
+            institutionName: parentInst.institutionName,
+          } : {}),
+        });
+        collegeId = college.id;
+
+        await setDoc(doc(db, 'principals', uid), {
+          name: name.trim(),
+          email: email.trim(),
+          collegeId,
+          ...(parentInst ? {
+            institutionId: parentInst.id,
+            institutionCode: parentInst.institutionCode,
+          } : {}),
+        });
+
+        toast({
+          title: 'Principal Account Created',
+          description: `Your College Code is: ${college.code}. Share this with your teachers, staff, and students.`,
         });
       } else {
         const college = await getCollegeByCode(collegeCode.trim());
         if (!college) {
           await userCred.user.delete();
-          toast({ variant: 'destructive', title: 'Invalid code', description: 'No institution found with this code.' });
+          toast({ variant: 'destructive', title: 'Invalid code', description: 'No college found with this College Code.' });
           return;
         }
         collegeId = college.id;
- 
+
         if (role === 'principal') {
           await setDoc(doc(db, 'principals', uid), {
             name: name.trim(),
@@ -143,6 +184,7 @@ export default function SignUpPage() {
             name: name.trim(),
             email: email.trim(),
             collegeId,
+            collegeIds: [collegeId],
           });
         } else if (role === 'teacher') {
           await setDoc(doc(db, 'teachers', uid), {
@@ -168,6 +210,12 @@ export default function SignUpPage() {
           });
         } else if (role === 'asset-manager') {
           await setDoc(doc(db, 'asset_managers', uid), {
+            name: name.trim(),
+            email: email.trim(),
+            collegeId,
+          });
+        } else if (role === 'account-manager') {
+          await setDoc(doc(db, 'account_managers', uid), {
             name: name.trim(),
             email: email.trim(),
             collegeId,
@@ -212,12 +260,13 @@ export default function SignUpPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="principal">Principal / Admin</SelectItem>
+                    <SelectItem value="principal">Principal (College / Campus Head)</SelectItem>
+                    <SelectItem value="college-admin">System Admin (Institution / Trust Head)</SelectItem>
+                    <SelectItem value="account-manager">Account Manager (Accounts Dept)</SelectItem>
+                    <SelectItem value="asset-manager">Asset Manager</SelectItem>
+                    <SelectItem value="clerk">Admission Clerk</SelectItem>
                     <SelectItem value="teacher">Teacher</SelectItem>
                     <SelectItem value="student">Student</SelectItem>
-                    <SelectItem value="college-admin">College / School Admin</SelectItem>
-                    <SelectItem value="clerk">Clerk</SelectItem>
-                    <SelectItem value="asset-manager">Asset Manager</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -230,8 +279,12 @@ export default function SignUpPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="create">Register/Create a New Institution</SelectItem>
-                      <SelectItem value="join">Join an Existing Institution by Code</SelectItem>
+                      <SelectItem value="create">
+                        {role === 'college-admin' ? 'Create New Institution / Trust' : 'Register a New College'}
+                      </SelectItem>
+                      <SelectItem value="join">
+                        {role === 'college-admin' ? 'Attach Existing College by Code' : 'Join an Existing College by Code'}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -275,29 +328,31 @@ export default function SignUpPage() {
               {(role === 'principal' || role === 'college-admin') && adminAction === 'create' && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="college-name">Institution name</Label>
+                    <Label htmlFor="college-name">
+                      {role === 'college-admin' ? 'Institution / Trust Name' : 'College / Campus Name'}
+                    </Label>
                     <Input
                       id="college-name"
-                      placeholder="School / College name"
+                      placeholder={role === 'college-admin' ? 'e.g. Oxford Educational Trust' : 'e.g. Cambridge Institute of Technology'}
                       value={collegeName}
                       onChange={(e) => setCollegeName(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Do you have an official code (DICE / University / State Govt)?</Label>
+                    <Label>Do you have an official college code (DICE / University / State Govt)?</Label>
                     <Select value={principalHasCode} onValueChange={(v) => setPrincipalHasCode(v as 'yes' | 'no')}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="yes">Yes, I have the code</SelectItem>
-                        <SelectItem value="no">No (private – generate one for me)</SelectItem>
+                        <SelectItem value="yes">Yes, I have an official code</SelectItem>
+                        <SelectItem value="no">No (generate a private code for me)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   {principalHasCode === 'yes' && (
                     <div className="space-y-2">
-                      <Label htmlFor="principal-code">Institution code</Label>
+                      <Label htmlFor="principal-code">Official College / DICE Code</Label>
                       <Input
                         id="principal-code"
                         placeholder="DICE / University code"
@@ -307,20 +362,39 @@ export default function SignUpPage() {
                       />
                     </div>
                   )}
+                  {role === 'principal' && (
+                    <div className="space-y-2 border-t pt-3 mt-2">
+                      <Label htmlFor="parent-inst-code-input">Parent Institution Code (Optional)</Label>
+                      <Input
+                        id="parent-inst-code-input"
+                        placeholder="e.g. INST-8492 (From System Admin)"
+                        value={parentInstitutionCodeInput}
+                        onChange={(e) => setParentInstitutionCodeInput(e.target.value)}
+                        className="font-mono uppercase"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        If your System Admin / Organization provided an Institution Code, enter it here to link your college now (or link later in Profile).
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
  
-              {(role === 'teacher' || role === 'student' || role === 'clerk' || role === 'asset-manager' || ((role === 'principal' || role === 'college-admin') && adminAction === 'join')) && (
+              {(role === 'teacher' || role === 'student' || role === 'clerk' || role === 'asset-manager' || role === 'account-manager' || ((role === 'principal' || role === 'college-admin') && adminAction === 'join')) && (
                 <div className="space-y-2">
-                  <Label htmlFor="college-code">Institution code</Label>
+                  <Label htmlFor="college-code">College Code</Label>
                   <Input
                     id="college-code"
-                    placeholder="Enter code given by your institution"
+                    placeholder="Enter College Code (e.g. XLQB4T)"
                     value={collegeCode}
                     onChange={(e) => setCollegeCode(e.target.value)}
-                    className="uppercase"
+                    className="uppercase font-mono tracking-wider"
                   />
-                  <p className="text-xs text-muted-foreground">Ask your principal for the institution code.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {role === 'college-admin' 
+                      ? 'Enter the College Code to attach that college to your institution.'
+                      : 'Ask your Principal for the College Code.'}
+                  </p>
                 </div>
               )}
 

@@ -12,7 +12,7 @@ const execAsync = promisify(exec);
  */
 async function sendWhatsAppMessageServerSide(phoneNumber: string, message: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const pythonServiceUrl = process.env.PYTHON_SERVICE_URL;
+    const pythonServiceUrl = process.env.PYTHON_SERVICE_URL || 'https://python-service-674639396653.us-central1.run.app';
     if (pythonServiceUrl) {
       try {
         console.log(`[Broadcast Send] Forwarding to Python service on Cloud Run: ${pythonServiceUrl}`);

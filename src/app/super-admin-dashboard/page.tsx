@@ -5,17 +5,21 @@ import Link from 'next/link';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { College } from '@/lib/types';
+import { backfillMissingCollegeCodes } from '@/lib/college-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { School, Search, Building2, Calendar, ArrowRight, LifeBuoy } from 'lucide-react';
+import { School, Search, Building2, Calendar, ArrowRight, LifeBuoy, CalendarCheck } from 'lucide-react';
 
 export default function SuperAdminDashboardPage() {
   const [colleges, setColleges] = useState<College[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [ticketCount, setTicketCount] = useState(0);
+  const [demoBookingCount, setDemoBookingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    backfillMissingCollegeCodes();
+
     const unsubColleges = onSnapshot(collection(db, 'colleges'), (snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as College));
       setColleges(list);
@@ -26,16 +30,21 @@ export default function SuperAdminDashboardPage() {
       setTicketCount(snap.size);
     });
 
+    const unsubDemos = onSnapshot(collection(db, 'demo_bookings'), (snap) => {
+      setDemoBookingCount(snap.size);
+    });
+
     return () => {
       unsubColleges();
       unsubTickets();
+      unsubDemos();
     };
   }, []);
 
   const filteredColleges = colleges.filter(
     (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchQuery.toLowerCase())
+      (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.code || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -70,6 +79,19 @@ export default function SuperAdminDashboardPage() {
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{ticketCount}</div>
               <p className="text-xs text-muted-foreground mt-1">College queries requiring attention</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/super-admin-dashboard/demo-bookings">
+          <Card className="bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-md transition-all duration-300 group cursor-pointer h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium group-hover:text-emerald-600 transition-colors">Demo Bookings</CardTitle>
+              <CalendarCheck className="h-5 w-5 text-emerald-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-foreground">{demoBookingCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Pending demo requests</p>
             </CardContent>
           </Card>
         </Link>

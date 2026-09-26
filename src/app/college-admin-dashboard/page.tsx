@@ -13,6 +13,13 @@ import {
   BookCopy,
   MessageSquare,
   BarChart3,
+  Building,
+  Copy,
+  Check,
+  UserCheck,
+  Fingerprint,
+  Palette,
+  Users,
 } from 'lucide-react';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
 import Link from 'next/link';
@@ -40,7 +47,8 @@ import { runAcademicYearBackfill } from '@/lib/backfill-academic-year-client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import type { Student, Teacher } from '@/lib/types';
+import type { Student, Teacher, College } from '@/lib/types';
+import { ensureSystemAdminInstitutionCode, getCollegesForSystemAdmin } from '@/lib/college-service';
 
 export default function CollegeAdminDashboardPage() {
   const principal = useCurrentPrincipal();
@@ -54,6 +62,7 @@ export default function CollegeAdminDashboardPage() {
   const [submissionCount, setSubmissionCount] = useState(0);
   const [leaveCount, setLeaveCount] = useState(0);
   const [assetRequestCount, setAssetRequestCount] = useState(0);
+  const [employeeCount, setEmployeeCount] = useState(0);
   const [isAcademicYearDialogOpen, setIsAcademicYearDialogOpen] = useState(false);
   const [isBackfilling, setIsBackfilling] = useState(false);
   const { toast } = useToast();
@@ -63,6 +72,27 @@ export default function CollegeAdminDashboardPage() {
   const [isExpired, setIsExpired] = useState(false);
   const [paymentLink, setPaymentLink] = useState('');
   const [hasLicense, setHasLicense] = useState(false);
+
+  // Institution Network States
+  const [instCode, setInstCode] = useState('');
+  const [copiedInstCode, setCopiedInstCode] = useState(false);
+  const [collegesCount, setCollegesCount] = useState(1);
+
+  useEffect(() => {
+    if (!principal?.id) return;
+    ensureSystemAdminInstitutionCode(principal.id).then((code) => {
+      if (code) setInstCode(code);
+    });
+
+    getCollegesForSystemAdmin({
+      systemAdminId: principal.id,
+      institutionCode: (principal as any).institutionCode,
+      collegeIds: principal.collegeIds,
+      currentCollegeId: principal.collegeId,
+    }).then((list) => {
+      setCollegesCount(list.length);
+    });
+  }, [principal?.id, principal?.collegeId, (principal as any)?.institutionCode, principal?.collegeIds]);
 
   // Helper countdown function
   const getCountdown = (expiryDateStr: string) => {
@@ -125,7 +155,7 @@ export default function CollegeAdminDashboardPage() {
   const handleBackfillCurrentYear = useCallback(async () => {
     setIsBackfilling(true);
     try {
-      const result = await runAcademicYearBackfill(currentAcademicYear);
+      const result = await runAcademicYearBackfill(currentAcademicYear, principal?.collegeId);
       if (result.error) {
         toast({
           variant: 'destructive',
@@ -141,7 +171,7 @@ export default function CollegeAdminDashboardPage() {
     } finally {
       setIsBackfilling(false);
     }
-  }, [currentAcademicYear, toast]);
+  }, [currentAcademicYear, principal?.collegeId, toast]);
 
   useEffect(() => {
     if (!principal?.collegeId) {
@@ -149,6 +179,7 @@ export default function CollegeAdminDashboardPage() {
       setSubmissionCount(0);
       setLeaveCount(0);
       setAssetRequestCount(0);
+      setEmployeeCount(0);
       return;
     }
 
@@ -176,11 +207,17 @@ export default function CollegeAdminDashboardPage() {
       (snap) => setAssetRequestCount(snap.size)
     );
 
+    const unsubEmployees = onSnapshot(
+      query(collection(db, 'teachers'), where('collegeId', '==', principal.collegeId)),
+      (snap) => setEmployeeCount(snap.size)
+    );
+
     return () => {
       unsubAssignments();
       unsubSubmissions();
       unsubLeaves();
       unsubAssetRequests();
+      unsubEmployees();
     };
   }, [principal?.collegeId]);
 
@@ -195,6 +232,13 @@ export default function CollegeAdminDashboardPage() {
       icon: Calendar,
       href: null as string | null,
       isAcademicYear: true,
+    },
+    {
+      title: 'Employee Management',
+      value: `${employeeCount} Staff`,
+      subtitle: 'Profiles, CTC & Leave Balances',
+      icon: Users,
+      href: '/college-admin-dashboard/employees',
     },
     {
       title: 'Faculty Assignments',
@@ -213,9 +257,16 @@ export default function CollegeAdminDashboardPage() {
     {
       title: 'Leave Requests',
       value: `${leaveCount} Requests`,
-      subtitle: 'Teacher leaves',
+      subtitle: 'Teacher & staff leaves',
       icon: Calendar,
       href: '/college-admin-dashboard/leaves',
+    },
+    {
+      title: 'Biometrics',
+      value: 'Biometric System',
+      subtitle: 'Device sync & attendance logs',
+      icon: Fingerprint,
+      href: '/college-admin-dashboard/biometrics',
     },
     {
       title: 'Asset Requests',
@@ -238,6 +289,20 @@ export default function CollegeAdminDashboardPage() {
       icon: BarChart3,
       href: '/college-admin-dashboard/reports',
     },
+    {
+      title: 'Theme Settings',
+      value: 'Appearance',
+      subtitle: 'Customize branding & dark mode',
+      icon: Palette,
+      href: '/college-admin-dashboard/theme',
+    },
+    {
+      title: 'Profile & Network Settings',
+      value: 'My Profile',
+      subtitle: 'Manage Institution & Colleges',
+      icon: UserCheck,
+      href: '/college-admin-dashboard/profile',
+    },
   ];
 
   const academicYearSelect = (
@@ -257,14 +322,44 @@ export default function CollegeAdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold font-headline tracking-tight sm:text-3xl">
-          College Admin Dashboard
-        </h1>
-        <p className="text-muted-foreground text-sm sm:text-base">
-          Welcome back, {principal?.name ?? 'Admin'}! Viewing data for{' '}
-          <span className="font-medium text-foreground">{selectedAcademicYear}</span>.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold font-headline tracking-tight sm:text-3xl">
+            System Admin Dashboard
+          </h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Institution & Campus Management Portal. Welcome back, <span className="font-semibold text-foreground">{principal?.name ?? 'System Admin'}</span>!
+          </p>
+        </div>
+
+        {/* Quick Institution Code Badge */}
+        {instCode && (
+          <div className="flex items-center gap-3 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 p-3 rounded-xl shadow-xs shrink-0">
+            <div className="p-2 bg-primary text-primary-foreground rounded-lg">
+              <Building className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Your Institution Code
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="font-mono font-bold text-base text-primary tracking-wide">{instCode}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(instCode);
+                    setCopiedInstCode(true);
+                    setTimeout(() => setCopiedInstCode(false), 2000);
+                    toast({ title: 'Copied', description: 'Institution Code copied to clipboard.' });
+                  }}
+                  className="p-1 hover:bg-primary/20 rounded transition text-primary"
+                  title="Copy Institution Code"
+                >
+                  {copiedInstCode ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {hasLicense && (

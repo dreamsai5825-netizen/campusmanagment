@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if Python Cloud Run Service URL is configured
-    const pythonServiceUrl = process.env.PYTHON_SERVICE_URL;
+    const pythonServiceUrl = process.env.PYTHON_SERVICE_URL || 'https://python-service-674639396653.us-central1.run.app';
     if (pythonServiceUrl) {
       try {
         console.log(`[WhatsApp Send] Forwarding to Python service on Cloud Run: ${pythonServiceUrl}`);

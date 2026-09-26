@@ -3,13 +3,22 @@
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export type AuthRole = 'super-admin' | 'admin' | 'teacher' | 'student' | 'college-admin' | 'clerk' | 'asset-manager' | null;
+export type AuthRole = 'super-admin' | 'admin' | 'teacher' | 'student' | 'college-admin' | 'clerk' | 'asset-manager' | 'account-manager' | null;
 
 /**
  * Determine which role the signed-in user has (by Firestore doc id = uid).
  */
 export async function getAuthRole(uid: string): Promise<AuthRole> {
-  const [superAdminSnap, principalSnap, teacherSnap, studentSnap, collegeAdminSnap, clerkSnap, assetManagerSnap] = await Promise.all([
+  const [
+    superAdminSnap,
+    principalSnap,
+    teacherSnap,
+    studentSnap,
+    collegeAdminSnap,
+    clerkSnap,
+    assetManagerSnap,
+    accountManagerSnap,
+  ] = await Promise.all([
     getDoc(doc(db, 'super_admins', uid)),
     getDoc(doc(db, 'principals', uid)),
     getDoc(doc(db, 'teachers', uid)),
@@ -17,7 +26,9 @@ export async function getAuthRole(uid: string): Promise<AuthRole> {
     getDoc(doc(db, 'college_admins', uid)),
     getDoc(doc(db, 'clerks', uid)),
     getDoc(doc(db, 'asset_managers', uid)),
+    getDoc(doc(db, 'account_managers', uid)),
   ]);
+
   if (superAdminSnap.exists()) return 'super-admin';
   if (principalSnap.exists()) return 'admin';
   if (teacherSnap.exists()) return 'teacher';
@@ -25,6 +36,7 @@ export async function getAuthRole(uid: string): Promise<AuthRole> {
   if (collegeAdminSnap.exists()) return 'college-admin';
   if (clerkSnap.exists()) return 'clerk';
   if (assetManagerSnap.exists()) return 'asset-manager';
+  if (accountManagerSnap.exists()) return 'account-manager';
   return null;
 }
 
@@ -35,7 +47,16 @@ export async function getAuthRoleByEmail(email: string): Promise<AuthRole> {
   const trimmed = email?.trim();
   if (!trimmed) return null;
   const studentEmail = trimmed.toLowerCase();
-  const [superAdminSnap, principalSnap, teacherSnap, studentSnap, collegeAdminSnap, clerkSnap, assetManagerSnap] = await Promise.all([
+  const [
+    superAdminSnap,
+    principalSnap,
+    teacherSnap,
+    studentSnap,
+    collegeAdminSnap,
+    clerkSnap,
+    assetManagerSnap,
+    accountManagerSnap,
+  ] = await Promise.all([
     getDocs(query(collection(db, 'super_admins'), where('email', '==', trimmed))),
     getDocs(query(collection(db, 'principals'), where('email', '==', trimmed))),
     getDocs(query(collection(db, 'teachers'), where('email', '==', trimmed))),
@@ -43,7 +64,9 @@ export async function getAuthRoleByEmail(email: string): Promise<AuthRole> {
     getDocs(query(collection(db, 'college_admins'), where('email', '==', trimmed))),
     getDocs(query(collection(db, 'clerks'), where('email', '==', trimmed))),
     getDocs(query(collection(db, 'asset_managers'), where('email', '==', trimmed))),
+    getDocs(query(collection(db, 'account_managers'), where('email', '==', trimmed))),
   ]);
+
   if (!superAdminSnap.empty) return 'super-admin';
   if (!principalSnap.empty) return 'admin';
   if (!teacherSnap.empty) return 'teacher';
@@ -51,6 +74,7 @@ export async function getAuthRoleByEmail(email: string): Promise<AuthRole> {
   if (!collegeAdminSnap.empty) return 'college-admin';
   if (!clerkSnap.empty) return 'clerk';
   if (!assetManagerSnap.empty) return 'asset-manager';
+  if (!accountManagerSnap.empty) return 'account-manager';
   return null;
 }
 
@@ -70,6 +94,8 @@ export function getDashboardPath(role: AuthRole): string {
       return '/clerk-dashboard';
     case 'asset-manager':
       return '/asset-manager-dashboard';
+    case 'account-manager':
+      return '/account-manager-dashboard';
     default:
       return '/';
   }

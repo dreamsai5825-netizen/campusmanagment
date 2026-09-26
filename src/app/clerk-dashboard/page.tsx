@@ -14,6 +14,7 @@ import {
   Landmark,
   UserPlus,
   Clock,
+  UserCheck,
 } from 'lucide-react';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
 import Link from 'next/link';
@@ -216,6 +217,13 @@ export default function ClerkDashboardPage() {
       subtitle: selectedAcademicYear,
       icon: Landmark,
       href: '/clerk-dashboard/finances',
+    },
+    {
+      title: 'Profile & Settings',
+      value: 'My Profile',
+      subtitle: 'Account details & credentials',
+      icon: UserCheck,
+      href: '/clerk-dashboard/profile',
     },
   ];
 

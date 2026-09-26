@@ -1,0 +1,410 @@
+[
+  {
+    "empNo": "1",
+    "name": "AMAN AM",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "2",
+    "name": "VASIM NIMBAL",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "01",
+    "name": "MAHANTESH MIRJI",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "02",
+    "name": "Mahesh Byalagoudar",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "03",
+    "name": "Laxmi Dalawai",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "04",
+    "name": "Samarth Chandrasali",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "05",
+    "name": "Kunal Chalawadi",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "06",
+    "name": "Akshata Kulkarni",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "07",
+    "name": "Sukanya Mancha",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "08",
+    "name": "Poornima Naik",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "09",
+    "name": "Jamir Mulla",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "10",
+    "name": "Anand Hiremath",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "13",
+    "name": "Ayaz Gour",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "14",
+    "name": "Shreyas Sangannavar",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "15",
+    "name": "Kishor Terdal",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "16",
+    "name": "Kiran Kempi",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "18",
+    "name": "Iranna Gadaginamath",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "19",
+    "name": "Satish Honakatti",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "22",
+    "name": "Vinayak Korav",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "23",
+    "name": "Sana Sanglikar",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "24",
+    "name": "Pratiksha Shinde",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "25",
+    "name": "Shivanand Bellundagi",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "26",
+    "name": "Soundarya Kottalagi",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "27",
+    "name": "Rajashree Kumbar",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "28",
+    "name": "Sujata Arutagi",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "12",
+    "name": "PREMA KUMATHALLI",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "30",
+    "name": "YALLAVVA URABINAVAR",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "31",
+    "name": "MAHESH ZARE",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "11",
+    "name": "SHILPA CHOUGULE",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "20",
+    "name": "MEENA KULKARNI",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "32",
+    "name": "RIFA ADWANI",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "33",
+    "name": "MURALIDHAR BALLOLLI",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "35",
+    "name": "LAGHAMANNA KOLI",
+    "groupId": 8,
+    "department": "NURSING"
+  },
+  {
+    "empNo": "36",
+    "name": "MURUGEPPA LOKUR",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "34",
+    "name": "SARASWATI SAVADATTI",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "37",
+    "name": "ANURADHA SINGHE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "38",
+    "name": "GOURAVVA TELI",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "39",
+    "name": "DATTARAYA KARPE",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "40",
+    "name": "DEEPASHRI MALIYE",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "41",
+    "name": "RESHMA KAGYAGOL",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "42",
+    "name": "Girish Mathpati",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "43",
+    "name": "SAMEER MANNUR",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "44",
+    "name": "ANUSHA MAMADAPUR",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "45",
+    "name": "SUNITA TELI",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "46",
+    "name": "TUSHAR PATIL",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "47",
+    "name": "RESHMA KAMBLE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "48",
+    "name": "SUNITA KAMBLE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "49",
+    "name": "PRIYANKA KAMBLE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "50",
+    "name": "SHRUTI KAMBLE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "51",
+    "name": "MANJULA KAMBLE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "52",
+    "name": "SHANTA KAMBLE",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "17",
+    "name": "Radhika Gasti",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "21",
+    "name": "Vaishnavi Kadam",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "53",
+    "name": "Monika Tambat",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "3",
+    "name": "",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "54",
+    "name": "Asif Yadwad",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "55",
+    "name": "Rajesh Kerure",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "56",
+    "name": "BHARAT PATIL",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "57",
+    "name": "Vaibhav Ballolli",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "58",
+    "name": "Prajwal Hipparagi",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "59",
+    "name": "Uday Kothiwale",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "60",
+    "name": "Rakshita Salai",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "61",
+    "name": "KANTESH M",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "62",
+    "name": "Appu Naik",
+    "groupId": 3,
+    "department": "PARAMEDICAL"
+  },
+  {
+    "empNo": "4",
+    "name": "",
+    "groupId": 1,
+    "department": "ADMINISTRATOR"
+  },
+  {
+    "empNo": "63",
+    "name": "Laxmi Kamble",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "64",
+    "name": "Ratnabayi Kamble",
+    "groupId": 2,
+    "department": "DEGREE"
+  },
+  {
+    "empNo": "65",
+    "name": "Anil Kadam",
+    "groupId": 2,
+    "department": "DEGREE"
+  }
+]

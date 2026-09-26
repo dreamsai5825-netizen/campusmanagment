@@ -11,7 +11,8 @@ export type BackfillAcademicYearResult = {
 };
 
 export async function runAcademicYearBackfill(
-  academicYear: string
+  academicYear: string,
+  collegeId?: string
 ): Promise<BackfillAcademicYearResult> {
   const user = auth.currentUser;
   if (!user) {
@@ -33,7 +34,7 @@ export async function runAcademicYearBackfill(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ academicYear }),
+    body: JSON.stringify({ academicYear, collegeId }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

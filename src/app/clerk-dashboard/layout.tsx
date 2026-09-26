@@ -18,6 +18,7 @@ import {
   MessageSquare,
   UserPlus,
   Clock,
+  Palette,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -100,6 +101,7 @@ const navItems = [
   { href: '/clerk-dashboard/classes', icon: BookUser, label: 'Classes' },
   { href: '/clerk-dashboard/subjects', icon: BookCopy, label: 'Subjects' },
   { href: '/clerk-dashboard/finances', icon: Landmark, label: 'Fee Book' },
+  { href: '/clerk-dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function ClerkDashboardLayout({
@@ -428,7 +430,7 @@ export default function ClerkDashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/'); }}>
+              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/login'); }}>
                 <LogOut className="size-5" />
                 <span>Logout</span>
               </SidebarMenuButton>

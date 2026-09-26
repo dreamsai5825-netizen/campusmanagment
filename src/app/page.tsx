@@ -1,510 +1,1392 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Script from 'next/script';
 import { 
-  GraduationCap, 
   ArrowRight, 
-  Download, 
-  LogIn, 
-  School, 
-  Users, 
+  Menu, 
+  X, 
+  Layers, 
+  Monitor, 
+  TrendingUp, 
   BookOpen, 
-  Landmark, 
-  CheckCircle, 
-  AlertOctagon,
-  Clock,
-  Sparkles,
-  ShieldCheck,
-  Zap,
-  Globe,
-  BadgePercent
+  Users, 
+  Shield, 
+  Calendar, 
+  Clock, 
+  Award, 
+  MapPin, 
+  Mail, 
+  Phone,
+  CheckCircle,
+  ChevronDown,
+  Download
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 
-export default function LandingPage() {
-  const router = useRouter();
-  const [downloadSuccess, setDownloadSuccess] = useState(false);
+export default function Home() {
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'erp' | 'lms'>('erp');
+  const [activeStakeholder, setActiveStakeholder] = useState<'admin' | 'teacher' | 'student' | 'principal'>('admin');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [preloaderWord, setPreloaderWord] = useState('Simplify');
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  const handleDownload = () => {
-    setDownloadSuccess(true);
-    setTimeout(() => {
-      setDownloadSuccess(false);
-    }, 3000);
-    // Trigger download of a mock PDF brochure
-    const link = document.createElement('a');
-    link.href = '#';
-    // link.download = 'CMS_Portal_Brochure.pdf'; // simulation
-    toastDownload();
+  useEffect(() => {
+    // Preloader words cycling animation
+    const words = ['Simplify', 'Connect', 'Succeed'];
+    let index = 0;
+    const interval = setInterval(() => {
+      index = (index + 1) % words.length;
+      setPreloaderWord(words[index]);
+    }, 600);
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+      clearInterval(interval);
+    }, 2000);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleDownloadClick = async () => {
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+        }
+      } catch (err) {
+        console.error('PWA install prompt error:', err);
+      }
+    } else {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (!isMobile) {
+        // Direct download of desktop shortcut file (.url)
+        const origin = window.location.origin;
+        const shortcutContent = `[InternetShortcut]\r\nURL=${origin}\r\nIconFile=${origin}/favicon.ico\r\nIconIndex=0\r\n`;
+        const blob = new Blob([shortcutContent], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'CampusConnect.url';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        // Mobile fallback instructions
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+          alert("To install CampusConnect on iOS: Tap the Share button in Safari, then select 'Add to Home Screen'.");
+        } else {
+          alert("To install CampusConnect on Android: Tap Chrome's menu (three dots), then select 'Install app' or 'Add to Home screen'.");
+        }
+      }
+    }
   };
 
-  const toastDownload = () => {
-    alert('Thank you! Campus Management System Product Brochure is being downloaded to your device.');
-  };
+  const stakeholders = [
+    {
+      id: 'admin' as const,
+      label: 'Smarter Administration',
+      title: 'Automated Administrative & Compliance Workflows',
+      desc: 'Empower your management team to run the campus effortlessly, save time, and maintain full transparency.',
+      points: [
+        'Enquiry & lead tracking with automated pipeline stages.',
+        'Razorpay, Paytm, and UPI gateway integrations for instant fee collection.',
+        'Real-time UDISE+ and CBCS-ready reporting frameworks.',
+        'Biometric, RFID, and Wi-Fi IP tracking auto-synced with staff HR.'
+      ],
+      screenshot: '/images/screenshots/admin/Screenshot 2026-07-08 155201.png'
+    },
+    {
+      id: 'teacher' as const,
+      label: 'Teachers',
+      title: 'Simplified Lesson Delivery & Assessment Prep',
+      desc: 'Free up your faculty from administrative tasks so they can focus on what matters most—teaching.',
+      points: [
+        'Automated class scheduling and conflict-free timetable generation.',
+        'AI-driven report cards and digital marksheet entries.',
+        'Blended classroom dashboard to assign tasks and upload lessons.',
+        'Instant messaging and announcements to parents and students.'
+      ],
+      screenshot: '/images/screenshots/teacher/Screenshot 2026-07-08 153952.png'
+    },
+    {
+      id: 'student' as const,
+      label: 'Students',
+      title: 'Dynamic Portals & Interactive Progress tracking',
+      desc: 'Give students an intuitive, all-in-one digital companion for their academic journey.',
+      points: [
+        'Unified dashboard for schedules, marks, attendance, and fees.',
+        'Digital homework submissions and learning resource repositories.',
+        'Live engagement trackers and automatic event notifications.',
+        'Profile mapping displaying course progress and grade history.'
+      ],
+      screenshot: '/images/screenshots/student/Screenshot 2026-07-08 154417.png'
+    },
+    {
+      id: 'principal' as const,
+      label: 'Principals / Directors',
+      title: 'Real-Time Insights & Institutional Governance',
+      desc: 'Get complete visual metrics and analytical models to lead your school or college with confidence.',
+      points: [
+        'High-level dashboards tracking attendance, registration, and finances.',
+        'Outcomes-Based Education (OBE) and NBA compliance audit trails.',
+        'Resource utilization reports for transport, classrooms, and staff.',
+        'Automated notifications to manage parent outreach and campus safety.'
+      ],
+      screenshot: '/images/screenshots/principal/Screenshot 2026-07-08 152313.png'
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-violet-500 selection:text-white font-sans overflow-x-hidden">
-      {/* CSS Keyframe Animations */}
+    <div className="edu-erp-landing">
+      {/* CSS Scoped Style Tags */}
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-12px) rotate(1deg); }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+        .edu-erp-landing {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          font-family: 'Poppins', sans-serif;
+          background: #03001e;
+          background: linear-gradient(to right, #0f0c1b, #24243e, #0f0c1b);
+          min-height: 100vh;
+          width: 100%;
+          color: white;
+          position: relative;
+          overflow-x: hidden;
         }
-        @keyframes pulse-glow {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.03); }
+
+        .edu-erp-landing * {
+          box-sizing: border-box;
         }
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
+
+        /* Preloader Animation Styles */
+        .preloader {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: #050816;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+          transition: transform 0.8s cubic-bezier(0.77, 0, 0.175, 1);
         }
-        .animate-float-delayed {
-          animation: float 8s ease-in-out infinite;
-          animation-delay: 2s;
+
+        .preloader.fade-out {
+          transform: translateY(-100%);
         }
-        .pulse-glow {
-          animation: pulse-glow 4s ease-in-out infinite;
+
+        .preloader-content {
+          text-align: center;
+        }
+
+        .preloader-word {
+          font-size: 4rem;
+          font-weight: 800;
+          color: #fcb900;
+          animation: slideUpWord 0.6s ease infinite alternate;
+          background: linear-gradient(to right, #ffffff, #fcb900);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        @keyframes slideUpWord {
+          0% {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        /* Navigation Bar */
+        .edu-erp-landing nav {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px 8%;
+          position: sticky;
+          top: 0;
+          backdrop-filter: blur(25px);
+          background: rgba(5, 8, 22, 0.7);
+          border-bottom: 1px solid rgba(255, 255, 255, .08);
+          z-index: 500;
+        }
+
+        .edu-erp-landing .logo {
+          font-size: 30px;
+          font-weight: 800;
+          background: linear-gradient(to right, #ffffff, #9333ea);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .edu-erp-landing nav .nav-links {
+          display: flex;
+          align-items: center;
+          gap: 30px;
+        }
+
+        .edu-erp-landing nav a {
+          color: white;
+          text-decoration: none;
+          font-size: 15px;
+          font-weight: 500;
+          transition: color 0.3s ease;
+        }
+
+        .edu-erp-landing nav a:hover {
+          color: #fcb900;
+        }
+
+        .edu-erp-landing nav .btn-login {
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 10px 20px;
+          border-radius: 8px;
+          transition: background 0.3s, border-color 0.3s;
+        }
+
+        .edu-erp-landing nav .btn-login:hover {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: white;
+          color: white;
+        }
+
+        .edu-erp-landing nav .btn-demo {
+          padding: 12px 24px;
+          background: #fcb900;
+          border: none;
+          color: #050816;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 15px rgba(252, 185, 0, 0.2);
+        }
+
+        .edu-erp-landing nav .btn-demo:hover {
+          background: #ffb900;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(252, 185, 0, 0.4);
+        }
+
+        .menu-toggle {
+          display: none;
+          cursor: pointer;
+          background: none;
+          border: none;
+          color: white;
+        }
+
+        @media (max-width: 991px) {
+          .menu-toggle {
+            display: block;
+          }
+
+          .edu-erp-landing nav .nav-links {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: rgba(5, 8, 22, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 30px 5%;
+            flex-direction: column;
+            gap: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          }
+
+          .edu-erp-landing nav .nav-links.open {
+            display: flex;
+          }
+        }
+
+        /* Hero Section */
+        .hero {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 100px 8%;
+          min-height: 85vh;
+          position: relative;
+          z-index: 10;
+        }
+
+        .hero-left {
+          width: 48%;
+        }
+
+        .hero-left h1 {
+          font-size: 55px;
+          line-height: 1.15;
+          font-weight: 800;
+          background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #9333ea 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          margin-bottom: 20px;
+        }
+
+        .hero-left p {
+          margin: 25px 0;
+          font-size: 18px;
+          color: #cbd5e1;
+          line-height: 1.6;
+        }
+
+        .hero-ctas {
+          display: flex;
+          gap: 20px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .hero-primary {
+          padding: 16px 36px;
+          font-size: 16px;
+          background: #fcb900;
+          border: none;
+          border-radius: 10px;
+          color: #050816;
+          cursor: pointer;
+          font-weight: 700;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 20px rgba(252, 185, 0, 0.25);
+        }
+
+        .hero-primary:hover {
+          background: #ffb900;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(252, 185, 0, 0.45);
+        }
+
+        .hero-secondary {
+          padding: 16px 36px;
+          font-size: 16px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 10px;
+          color: white;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .hero-secondary:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .hero-download {
+          padding: 16px 36px;
+          font-size: 16px;
+          background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+          border: none;
+          border-radius: 10px;
+          color: white;
+          cursor: pointer;
+          font-weight: 700;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          box-shadow: 0 4px 20px rgba(124, 58, 237, 0.25);
+        }
+
+        .hero-download:hover {
+          background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(124, 58, 237, 0.45);
+        }
+
+        .hero-right {
+          width: 48%;
+          position: relative;
+          height: 480px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        /* Hero Floating Screenshot Cards Stack */
+        .hero-stack-bg {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background: radial-gradient(circle, rgba(147, 51, 234, 0.15) 0%, transparent 70%);
+          filter: blur(40px);
+          z-index: 1;
+        }
+
+        .hero-card {
+          position: absolute;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(10px);
+          z-index: 2;
+        }
+
+        .hero-card img {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+
+        .hero-card.primary {
+          width: 85%;
+          top: 10%;
+          left: 5%;
+          animation: floatPrimary 6s ease-in-out infinite alternate;
+          z-index: 4;
+        }
+
+        .hero-card.secondary {
+          width: 65%;
+          bottom: 10%;
+          right: 5%;
+          animation: floatSecondary 8s ease-in-out infinite alternate;
+          z-index: 5;
+        }
+
+        @keyframes floatPrimary {
+          0% {
+            transform: translateY(0) rotate(-2deg);
+          }
+          100% {
+            transform: translateY(-20px) rotate(1deg);
+          }
+        }
+
+        @keyframes floatSecondary {
+          0% {
+            transform: translateY(0) rotate(3deg);
+          }
+          100% {
+            transform: translateY(-25px) rotate(-1deg);
+          }
+        }
+
+        @media (max-width: 991px) {
+          .hero {
+            flex-direction: column;
+            padding: 60px 5%;
+            gap: 60px;
+            text-align: center;
+          }
+
+          .hero-left, .hero-right {
+            width: 100%;
+          }
+
+          .hero-left h1 {
+            font-size: 38px;
+          }
+
+          .hero-ctas {
+            justify-content: center;
+          }
+
+          .hero-right {
+            height: 380px;
+          }
+        }
+
+        /* Infinite Marquee Banner */
+        .marquee-section {
+          background: rgba(255, 255, 255, 0.02);
+          border-y: 1px solid rgba(255, 255, 255, 0.06);
+          padding: 22px 0;
+          overflow: hidden;
+          white-space: nowrap;
+          position: relative;
+          z-index: 10;
+        }
+
+        .marquee-container {
+          display: inline-flex;
+          animation: marquee 35s linear infinite;
+          gap: 60px;
+        }
+
+        .marquee-item {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          color: rgba(255, 255, 255, 0.85);
+          font-weight: 600;
+          font-size: 16px;
+        }
+
+        .marquee-item span.dot {
+          width: 8px;
+          height: 8px;
+          background: #fcb900;
+          border-radius: 50%;
+          display: inline-block;
+          box-shadow: 0 0 10px #fcb900;
+        }
+
+        @keyframes marquee {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+
+        /* Interactive ERP vs LMS Solutions Section */
+        .solutions-section {
+          padding: 100px 8%;
+          position: relative;
+          z-index: 10;
+        }
+
+        .section-header {
+          text-align: center;
+          max-width: 800px;
+          margin: 0 auto 60px;
+        }
+
+        .section-header h2 {
+          font-size: 42px;
+          font-weight: 800;
+          margin-bottom: 20px;
+          background: linear-gradient(to right, #fff, #cbd5e1);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .section-header p {
+          font-size: 18px;
+          color: #cbd5e1;
+        }
+
+        .solutions-tabs {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 50px;
+        }
+
+        .tabs-container {
+          display: flex;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 6px;
+          border-radius: 12px;
+          backdrop-filter: blur(10px);
+        }
+
+        .tab-btn {
+          padding: 14px 28px;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          border: none;
+          background: transparent;
+          color: #cbd5e1;
+          transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+          background: #fcb900;
+          color: #050816;
+          box-shadow: 0 4px 12px rgba(252, 185, 0, 0.2);
+        }
+
+        .solutions-grid {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 60px;
+        }
+
+        .solutions-features {
+          width: 45%;
+          display: flex;
+          flex-direction: column;
+          gap: 30px;
+        }
+
+        .feature-item-card {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 16px;
+          padding: 24px;
+          transition: all 0.3s;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .feature-item-card:hover {
+          transform: translateX(10px);
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(252, 185, 0, 0.3);
+        }
+
+        .feature-item-card h3 {
+          font-size: 20px;
+          font-weight: 700;
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .feature-item-card h3 span.badge {
+          background: rgba(252, 185, 0, 0.1);
+          color: #fcb900;
+          font-size: 12px;
+          padding: 3px 10px;
+          border-radius: 12px;
+          font-weight: 500;
+        }
+
+        .feature-item-card p {
+          color: #cbd5e1;
+          line-height: 1.6;
+        }
+
+        .solutions-preview {
+          width: 50%;
+          position: relative;
+          border-radius: 20px;
+          overflow: hidden;
+          box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          aspect-ratio: 16/10;
+        }
+
+        .solutions-preview img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transition: opacity 0.5s ease;
+        }
+
+        @media (max-width: 991px) {
+          .solutions-section {
+            padding: 60px 5%;
+          }
+
+          .solutions-grid {
+            flex-direction: column;
+            gap: 40px;
+          }
+
+          .solutions-features, .solutions-preview {
+            width: 100%;
+          }
+        }
+
+        /* Stakeholder Empowerment Section ("EDU for...") */
+        .stakeholders-section {
+          padding: 100px 8%;
+          background: rgba(255, 255, 255, 0.01);
+          border-y: 1px solid rgba(255, 255, 255, 0.04);
+          position: relative;
+          z-index: 10;
+        }
+
+        .stakeholders-tabs-wrap {
+          display: flex;
+          justify-content: center;
+          gap: 20px;
+          flex-wrap: wrap;
+          margin-bottom: 50px;
+        }
+
+        .stakeholder-tab {
+          padding: 12px 24px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 30px;
+          color: #cbd5e1;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.3s;
+        }
+
+        .stakeholder-tab.active {
+          background: #fcb900;
+          color: #050816;
+          border-color: #fcb900;
+          box-shadow: 0 4px 15px rgba(252, 185, 0, 0.25);
+        }
+
+        .stakeholder-tab:hover:not(.active) {
+          background: rgba(255, 255, 255, 0.07);
+          color: white;
+        }
+
+        .stakeholder-display {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 60px;
+        }
+
+        .stakeholder-text {
+          width: 45%;
+        }
+
+        .stakeholder-text h3 {
+          font-size: 32px;
+          font-weight: 800;
+          margin-bottom: 15px;
+          background: linear-gradient(to right, #ffffff, #fcb900);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .stakeholder-text p.desc {
+          font-size: 17px;
+          color: #cbd5e1;
+          line-height: 1.6;
+          margin-bottom: 25px;
+        }
+
+        .stakeholder-text ul {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .stakeholder-text li {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          color: #e2e8f0;
+          line-height: 1.5;
+        }
+
+        .stakeholder-text li svg {
+          color: #fcb900;
+          flex-shrink: 0;
+          margin-top: 3px;
+        }
+
+        .stakeholder-preview {
+          width: 50%;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(5, 8, 22, 0.8);
+          aspect-ratio: 16/10;
+        }
+
+        .stakeholder-preview img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        @media (max-width: 991px) {
+          .stakeholders-section {
+            padding: 60px 5%;
+          }
+
+          .stakeholder-display {
+            flex-direction: column;
+            gap: 40px;
+          }
+
+          .stakeholder-text, .stakeholder-preview {
+            width: 100%;
+          }
+        }
+
+        /* Integrations Section */
+        .integrations-section {
+          padding: 100px 8%;
+          position: relative;
+          z-index: 10;
+        }
+
+        .integrations-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 30px;
+        }
+
+        .integration-card {
+          padding: 30px 20px;
+          text-align: center;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 20px;
+          backdrop-filter: blur(10px);
+          transition: all 0.4s ease;
+        }
+
+        .integration-card:hover {
+          transform: translateY(-8px);
+          border-color: rgba(147, 51, 234, 0.3);
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: 0 15px 40px rgba(147, 51, 234, 0.15);
+        }
+
+        .integration-icon-wrap {
+          width: 70px;
+          height: 70px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 20px;
+        }
+
+        .integration-card h3 {
+          font-size: 18px;
+          font-weight: 700;
+          margin-bottom: 10px;
+        }
+
+        .integration-card p {
+          font-size: 14px;
+          color: #cbd5e1;
+          line-height: 1.5;
+        }
+
+        /* FAQ Section Accordion */
+        .faq-section {
+          padding: 100px 8%;
+          position: relative;
+          z-index: 10;
+        }
+
+        .faq-wrap {
+          max-width: 800px;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .faq-item {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 12px;
+          overflow: hidden;
+          transition: border-color 0.3s;
+        }
+
+        .faq-item:hover {
+          border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .faq-item summary {
+          padding: 24px;
+          font-size: 18px;
+          font-weight: 600;
+          cursor: pointer;
+          list-style: none;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          outline: none;
+        }
+
+        .faq-item summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .faq-item summary .faq-icon {
+          transition: transform 0.3s;
+          color: #fcb900;
+        }
+
+        .faq-item[open] summary .faq-icon {
+          transform: rotate(180deg);
+        }
+
+        .faq-answer {
+          padding: 0 24px 24px;
+          color: #cbd5e1;
+          line-height: 1.6;
+        }
+
+        /* Call To Action Section */
+        .cta-section {
+          padding: 120px 8%;
+          text-align: center;
+          position: relative;
+          z-index: 10;
+        }
+
+        .cta-box {
+          background: linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 80px 40px;
+          border-radius: 30px;
+          max-width: 1000px;
+          margin: 0 auto;
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(20px);
+        }
+
+        .cta-box h2 {
+          font-size: 48px;
+          font-weight: 800;
+          margin-bottom: 20px;
+          background: linear-gradient(to right, #ffffff, #fcb900);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .cta-box p {
+          font-size: 18px;
+          color: #cbd5e1;
+          max-width: 600px;
+          margin: 0 auto 40px;
+        }
+
+        /* Global Footer */
+        footer {
+          background: rgba(3, 0, 15, 0.95);
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 80px 8% 40px;
+          position: relative;
+          z-index: 10;
+        }
+
+        .footer-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 50px;
+          margin-bottom: 50px;
+        }
+
+        .footer-col h4 {
+          font-size: 16px;
+          font-weight: 700;
+          margin-bottom: 25px;
+          color: #fcb900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .footer-col ul {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .footer-col a {
+          color: #cbd5e1;
+          text-decoration: none;
+          transition: color 0.3s;
+        }
+
+        .footer-col a:hover {
+          color: #fcb900;
+        }
+
+        .footer-col.about p {
+          color: #cbd5e1;
+          line-height: 1.6;
+          margin-bottom: 20px;
+        }
+
+        .footer-col.contact li {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          color: #cbd5e1;
+        }
+
+        .footer-col.contact svg {
+          color: #fcb900;
+          flex-shrink: 0;
+        }
+
+        .footer-bottom {
+          padding-top: 40px;
+          border-top: 1px solid rgba(255, 255, 255, 0.06);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          color: #64748b;
+          font-size: 14px;
+        }
+
+        .footer-bottom-links {
+          display: flex;
+          gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+          .footer-bottom {
+            flex-direction: column;
+            gap: 20px;
+            text-align: center;
+          }
+
+          .footer-bottom-links {
+            justify-content: center;
+          }
         }
       `}</style>
 
-      {/* Grid background decorative */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-35" />
-
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-50 border-b border-slate-900 bg-slate-950/80 backdrop-blur-md px-4 py-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/30">
-              <GraduationCap className="h-5.5 w-5.5 text-white" />
-            </div>
-            <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-violet-400 bg-clip-text text-transparent">
-              Campus Management System
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-slate-300 hover:text-white hover:bg-slate-900 gap-1.5"
-              onClick={handleDownload}
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Download brochure</span>
-            </Button>
-            <Button 
-              size="sm"
-              className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/20 gap-1.5"
-              onClick={() => router.push('/login')}
-            >
-              <LogIn className="h-4 w-4" />
-              <span>Login</span>
-            </Button>
-          </div>
+      {/* Preloader Intro Screen */}
+      <div className={`preloader ${!loading ? 'fade-out' : ''}`}>
+        <div className="preloader-content">
+          <div className="preloader-word">{preloaderWord}</div>
         </div>
-      </header>
+      </div>
+
+      {/* Global Header Navigation */}
+      <nav>
+        <Link href="/" className="logo">PranganPro</Link>
+        <button 
+          className="menu-toggle" 
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+        <div className={`nav-links ${mobileMenuOpen ? 'open' : ''}`}>
+          <Link href="/" onClick={() => setMobileMenuOpen(false)}>Home</Link>
+          <Link href="/modules" onClick={() => setMobileMenuOpen(false)}>Modules</Link>
+          <Link href="/gallery" onClick={() => setMobileMenuOpen(false)}>Gallery</Link>
+          <Link href="/login" className="btn-login" onClick={() => setMobileMenuOpen(false)}>Login</Link>
+          <Link href="/book-demo" onClick={() => setMobileMenuOpen(false)}>
+            <button className="btn-demo">Book Demo</button>
+          </Link>
+        </div>
+      </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-12 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
-          
-          {/* Left Column: Copy */}
-          <div className="lg:col-span-6 space-y-6 text-left relative z-10">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-xs font-semibold text-violet-400">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Modern College Management Suite</span>
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
-              One Portal. <br />
-              <span className="bg-gradient-to-r from-violet-400 via-indigo-400 to-emerald-400 bg-clip-text text-transparent">
-                Infinite Control.
-              </span>
-            </h1>
-
-            <p className="text-slate-400 text-base sm:text-lg max-w-xl leading-relaxed">
-              Campus Management System streamlines academic schedules, student tracking, communication nodes, financial records, and operational workflows into a single unified workspace.
-            </p>
-
-            <div className="flex flex-wrap gap-4 pt-2">
-              <Button 
-                size="lg" 
-                className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/30 px-6 gap-2"
-                onClick={() => router.push('/login')}
-              >
-                Launch App
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="border-slate-800 hover:bg-slate-900/60 px-6"
-                onClick={() => {
-                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                Explore Features
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-6 pt-8 border-t border-slate-900/80">
-              <div>
-                <p className="text-2xl font-bold text-white">100%</p>
-                <p className="text-xs text-slate-500 mt-0.5">Secure Firestore Database</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">Real-time</p>
-                <p className="text-xs text-slate-500 mt-0.5">Push Notifications</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">0-config</p>
-                <p className="text-xs text-slate-500 mt-0.5">PWA Installation</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Interactive CSS UI Preview */}
-          <div className="lg:col-span-6 relative flex justify-center">
-            {/* Ambient background glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-violet-600/10 blur-[80px] pointer-events-none pulse-glow" />
-
-            {/* Simulated Desktop App frame */}
-            <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900/80 p-1.5 shadow-2xl shadow-black/80 animate-float">
-              {/* Window Bar */}
-              <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800/80">
-                <div className="flex gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-red-500/60" />
-                  <span className="w-3 h-3 rounded-full bg-yellow-500/60" />
-                  <span className="w-3 h-3 rounded-full bg-green-500/60" />
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono">cms-portal.edu</span>
-                <div className="w-12" />
-              </div>
-
-              {/* Mock Dashboard Dashboard screen */}
-              <div className="bg-slate-950 p-4 rounded-xl space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] text-slate-500">Overview</span>
-                    <h4 className="text-sm font-bold text-white">Annapurna Institute</h4>
-                  </div>
-                  <BadgePercent className="h-4 w-4 text-violet-400" />
-                </div>
-
-                {/* Dashboard grid mock widgets */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/40">
-                    <span className="text-[10px] text-slate-500 font-medium">Students Enrolled</span>
-                    <div className="text-lg font-bold text-white mt-0.5">82</div>
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                      <div className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full rounded-full" style={{ width: '75%' }} />
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/40">
-                    <span className="text-[10px] text-slate-500 font-medium">Faculty Members</span>
-                    <div className="text-lg font-bold text-white mt-0.5">7</div>
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                      <div className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full" style={{ width: '45%' }} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live transaction bar chart SVG mock */}
-                <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/40 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-slate-500 font-medium">Fee Book Metrics (₹)</span>
-                    <span className="text-[10px] text-emerald-400 font-bold">Collected: 85%</span>
-                  </div>
-                  <div className="h-16 flex items-end justify-between px-2 pt-2 gap-1.5">
-                    <div className="bg-slate-800 hover:bg-violet-600/30 rounded-t w-full h-8 transition-colors" />
-                    <div className="bg-slate-800 hover:bg-violet-600/30 rounded-t w-full h-12 transition-colors" />
-                    <div className="bg-slate-800 hover:bg-violet-600/30 rounded-t w-full h-10 transition-colors" />
-                    <div className="bg-violet-600 rounded-t w-full h-14" />
-                    <div className="bg-slate-800 hover:bg-violet-600/30 rounded-t w-full h-6 transition-colors" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Decorative second card floating behind */}
-            <div className="absolute -bottom-6 -right-4 w-48 rounded-xl border border-slate-800 bg-slate-950/90 p-3 shadow-lg shadow-black/50 animate-float-delayed hidden sm:block">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="p-1 rounded bg-amber-500/20 text-amber-500">
-                  <Clock className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">License Status</span>
-              </div>
-              <p className="text-[11px] font-semibold text-white">Expiry: 245 Days left</p>
-              <div className="w-full bg-slate-800 h-1 rounded-full mt-2">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: '65%' }} />
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Feature Section */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 border-t border-slate-900 bg-slate-950/40 relative">
-        {/* Grid background decorative */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1.5px,transparent_1.5px),linear-gradient(to_bottom,#0f172a_1.5px,transparent_1.5px)] bg-[size:6rem_6rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20 pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto space-y-16 relative z-10">
-          
-          {/* Section heading */}
-          <div className="text-center max-w-2xl mx-auto space-y-4">
-            <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-xs font-semibold text-emerald-400">
-              <span>All-In-One Unified Platform</span>
-            </div>
-            <h2 className="text-3xl font-extrabold font-headline tracking-tight sm:text-4xl">
-              Role-Scoped Dashboard Features
-            </h2>
-            <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-              Campus Management System provides custom interfaces tailored specifically for the key stakeholders of your college.
-            </p>
-          </div>
-
-          {/* 3 Floating Cards Grid */}
-          <div className="grid gap-8 md:grid-cols-3">
-            
-            {/* Principal Card */}
-            <div className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-slate-900/30 p-6 sm:p-8 hover:bg-slate-900/50 hover:border-violet-500/30 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-600/5">
-              <div className="space-y-6">
-                <div className="h-12 w-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20 group-hover:scale-110 group-hover:bg-blue-500/20 transition-all duration-300">
-                  <School className="h-6 w-6" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-white group-hover:text-violet-400 transition-colors">
-                    Principal Control Suite
-                  </h3>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Executive Administration
-                  </p>
-                  <p className="text-slate-400 text-sm leading-relaxed">
-                    A comprehensive cockpit designed for executive management to oversee the entire ecosystem.
-                  </p>
-                </div>
-                <ul className="space-y-3.5 pt-2">
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Manage the system with features like finance, student & teacher details</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Generate & print receipts complete with custom college branding</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="pt-8 mt-auto border-t border-slate-900/60">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Institution Stats</span>
-                <div className="mt-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/60 space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Total Enrolled Students:</span>
-                    <span className="font-bold text-white">1,200+</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Active Faculty Members:</span>
-                    <span className="font-bold text-white">60+</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Teacher Card */}
-            <div className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-slate-900/30 p-6 sm:p-8 hover:bg-slate-900/50 hover:border-violet-500/30 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-600/5">
-              <div className="space-y-6">
-                <div className="h-12 w-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20 group-hover:scale-110 group-hover:bg-purple-500/20 transition-all duration-300">
-                  <Users className="h-6 w-6" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-white group-hover:text-violet-400 transition-colors">
-                    Faculty Planner Console
-                  </h3>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Academic Planning
-                  </p>
-                  <p className="text-slate-400 text-sm leading-relaxed">
-                    Dedicated console enabling teachers to organize lectures, communicate, and grade students.
-                  </p>
-                </div>
-                <ul className="space-y-3.5 pt-2">
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Direct communication channels with parents, teachers, and students</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Log classroom attendance records and daily checklists</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Manage assignments, detailed assessments, and announcements</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="pt-8 mt-auto border-t border-slate-900/60">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Class Schedule & Grading</span>
-                <div className="mt-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/60 space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Class Attendance:</span>
-                    <span className="font-semibold text-emerald-400">92%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Submissions:</span>
-                    <span className="font-semibold text-violet-400">18 / 20 Students</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Student Card */}
-            <div className="group relative flex flex-col justify-between rounded-2xl border border-slate-800/80 bg-slate-900/30 p-6 sm:p-8 hover:bg-slate-900/50 hover:border-violet-500/30 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-violet-600/5">
-              <div className="space-y-6">
-                <div className="h-12 w-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all duration-300">
-                  <BookOpen className="h-6 w-6" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-white group-hover:text-violet-400 transition-colors">
-                    Student Portal
-                  </h3>
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Personalized Workspace
-                  </p>
-                  <p className="text-slate-400 text-sm leading-relaxed">
-                    Interactive dashboard for students to interact with their classes and track academic history.
-                  </p>
-                </div>
-                <ul className="space-y-3.5 pt-2">
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Communicate directly with your teachers in personal chat rooms</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Submit assignments digitally and review teacher comments</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-300 text-sm">
-                    <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Track your class attendance records and check assessment marks</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="pt-8 mt-auto border-t border-slate-900/60">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">My Fee Account Summary</span>
-                <div className="mt-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/60 space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Total Paid:</span>
-                    <span className="font-extrabold text-emerald-400">₹ 24,000</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Outstanding:</span>
-                    <span className="font-extrabold text-amber-500">₹ 4,000</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* Feature Grid / Quality metrics */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-t border-slate-900 bg-slate-950/80">
-        <div className="max-w-7xl mx-auto space-y-12 text-center">
-          <div className="space-y-4">
-            <h2 className="text-2xl sm:text-3xl font-extrabold font-headline">Engineered for Academic Excellence</h2>
-            <p className="text-slate-400 text-sm max-w-lg mx-auto">
-              Campus Management System integrates state-of-the-art technologies to ensure stability, performance, and security.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <Card className="bg-slate-900/30 border-slate-800/80 hover:border-slate-800 transition-colors">
-              <CardContent className="pt-6 space-y-3 text-left">
-                <div className="p-2.5 rounded-lg bg-violet-600/10 text-violet-400 w-fit">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <h4 className="font-bold text-white text-base">Complete Data Integrity</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Utilizes fine-grained Firebase Security Rules to restrict document read/write processes based strictly on user roles and college parameters.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-900/30 border-slate-800/80 hover:border-slate-800 transition-colors">
-              <CardContent className="pt-6 space-y-3 text-left">
-                <div className="p-2.5 rounded-lg bg-emerald-600/10 text-emerald-400 w-fit">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <h4 className="font-bold text-white text-base">Instant Sync (Real-time)</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Built-in reactive listeners query updates instantly. Whenever a principal broadcasts announcements or deactivates a login, dashboards switch immediately.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-900/30 border-slate-800/80 hover:border-slate-800 transition-colors">
-              <CardContent className="pt-6 space-y-3 text-left">
-                <div className="p-2.5 rounded-lg bg-blue-600/10 text-blue-400 w-fit">
-                  <Globe className="h-5 w-5" />
-                </div>
-                <h4 className="font-bold text-white text-base">Offline Capabilities (PWA)</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Supports progressive web app features, enabling students to access class timetables, calendar schedules, and contact sheets offline.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Footer Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-t border-slate-900 bg-slate-950/20 relative">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <h2 className="text-3xl font-extrabold font-headline sm:text-4xl text-white">
-            Ready to Streamline Your College Administration?
-          </h2>
-          <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
-            Get started today. Sign up your college portal or request a product demo to explore our full-scale features.
+      <section className="hero">
+        <div className="hero-left">
+          <h1>Campus Management System for Schools &amp; Colleges</h1>
+          <p>
+            Unify every academic, operational, and administrative task in one powerful system — designed to build modern, compliant, and smart campuses.
           </p>
-          <div className="flex justify-center gap-4 pt-2">
-            <Button 
-              size="lg" 
-              className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/25 px-8 gap-2"
-              onClick={() => router.push('/login')}
+          <div className="hero-ctas">
+            <Link href="/book-demo">
+              <button className="hero-primary">Book Free Demo</button>
+            </Link>
+            <Link href="/modules">
+              <button className="hero-secondary">
+                Explore Modules <ArrowRight size={18} />
+              </button>
+            </Link>
+            <button 
+              className="hero-download"
+              onClick={handleDownloadClick}
             >
-              Sign In Now
-              <LogIn className="h-4 w-4" />
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="border-slate-800 hover:bg-slate-900/60 px-8"
-              onClick={handleDownload}
-            >
-              Download Brochure
-            </Button>
+              <Download size={18} /> Download App
+            </button>
+          </div>
+        </div>
+        <div className="hero-right">
+          <div className="hero-stack-bg"></div>
+          {/* Layered floating mockup cards */}
+          <div className="hero-card primary">
+            <img src="/images/dashboard.png" alt="PranganPro Dashboard View" />
+          </div>
+          <div className="hero-card secondary">
+            <img src="/images/screenshots/admin/Screenshot 2026-07-08 155250.png" alt="Admissions Enquiry Details" />
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-slate-900 bg-slate-950 px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-600 space-y-2">
-        <div className="flex justify-center items-center gap-2 mb-2">
-          <div className="h-6 w-6 rounded bg-violet-600 flex items-center justify-center">
-            <GraduationCap className="h-3.5 w-3.5 text-white" />
-          </div>
-          <span className="font-bold text-sm tracking-tight text-white">
-            Campus Management System
-          </span>
+      {/* Infinite Auto-scrolling Marquee */}
+      <div className="marquee-section">
+        <div className="marquee-container">
+          {/* Track 1 */}
+          <div className="marquee-item"><span className="dot"></span> Biometric and Security Hardware integration</div>
+          <div className="marquee-item"><span className="dot"></span> Seamless Tally Integration</div>
+          <div className="marquee-item"><span className="dot"></span> Razorpay &amp; Paytm Payment Gateways</div>
+          <div className="marquee-item"><span className="dot"></span> NEP 2020 Compliant Frameworks</div>
+          <div className="marquee-item"><span className="dot"></span> SMS, Email &amp; WhatsApp Automated Alerts</div>
+          <div className="marquee-item"><span className="dot"></span> Outcome Based Education (OBE) Ready</div>
+          <div className="marquee-item"><span className="dot"></span> CBCS Curriculums and Credit System</div>
+          
+          {/* Repeated Track for Infinite Loop */}
+          <div className="marquee-item"><span className="dot"></span> Biometric and Security Hardware integration</div>
+          <div className="marquee-item"><span className="dot"></span> Seamless Tally Integration</div>
+          <div className="marquee-item"><span className="dot"></span> Razorpay &amp; Paytm Payment Gateways</div>
+          <div className="marquee-item"><span className="dot"></span> NEP 2020 Compliant Frameworks</div>
+          <div className="marquee-item"><span className="dot"></span> SMS, Email &amp; WhatsApp Automated Alerts</div>
+          <div className="marquee-item"><span className="dot"></span> Outcome Based Education (OBE) Ready</div>
+          <div className="marquee-item"><span className="dot"></span> CBCS Curriculums and Credit System</div>
         </div>
-        <p>&copy; {new Date().getFullYear()} Campus Management System. All rights reserved.</p>
-        <p>Built with Next.js, Firebase Firestore, and Tailwind CSS.</p>
-      </footer>
+      </div>
+
+      {/* Core Solutions (ERP vs LMS Tabs) Section */}
+      <section className="solutions-section">
+        <div className="section-header">
+          <h2>Two Platforms, One Connected Ecosystem</h2>
+          <p>
+            Choose between administrative operations or classroom teaching tools, all integrated with a single centralized database.
+          </p>
+        </div>
+
+        <div className="solutions-tabs">
+          <div className="tabs-container">
+            <button 
+              className={`tab-btn ${activeTab === 'erp' ? 'active' : ''}`}
+              onClick={() => setActiveTab('erp')}
+            >
+              Enterprise ERP
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'lms' ? 'active' : ''}`}
+              onClick={() => setActiveTab('lms')}
+            >
+              Academic LMS
+            </button>
+          </div>
+        </div>
+
+        <div className="solutions-grid">
+          <div className="solutions-features">
+            {activeTab === 'erp' ? (
+              <>
+                <div className="feature-item-card">
+                  <h3>Admissions &amp; Enquiry <span className="badge">Active</span></h3>
+                  <p>Digitize applications from prospect enquiry to official onboarding, with automated merit lists and lead funnel statistics.</p>
+                </div>
+                <div className="feature-item-card">
+                  <h3>Fee Collection &amp; Tally Sync <span className="badge">Tally Sync</span></h3>
+                  <p>Automate dynamic fee cycles, process payments online, and push ledger updates directly to Tally ERP.</p>
+                </div>
+                <div className="feature-item-card">
+                  <h3>Biometric HR &amp; RFID Attendance <span className="badge">Hardware</span></h3>
+                  <p>Monitor leaves, record classroom presence, and sync teacher/student logs directly with the master schedule.</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="feature-item-card">
+                  <h3>NEP 2020 &amp; CBCS Planner <span className="badge">NEP Ready</span></h3>
+                  <p>Build outcomes-based learning structures and assign flexible course choices with credit trackers.</p>
+                </div>
+                <div className="feature-item-card">
+                  <h3>AI-Assisted Timetable Builder <span className="badge">AI Powered</span></h3>
+                  <p>Create conflict-free school or college schedules automatically, distributing classrooms, labs, and staff slots.</p>
+                </div>
+                <div className="feature-item-card">
+                  <h3>Assessments &amp; Report Cards <span className="badge">Automated</span></h3>
+                  <p>Design grading systems for online/offline exams, calculate GPA scores, and generate compliant report card templates.</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="solutions-preview">
+            {activeTab === 'erp' ? (
+              <img src="/images/dashboard.png" alt="ERP Dashboard Preview" />
+            ) : (
+              <img src="/images/screenshots/teacher/Screenshot 2026-07-08 154144.png" alt="LMS Classroom Preview" />
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Stakeholders Section ("EDU for...") */}
+      <section className="stakeholders-section">
+        <div className="section-header">
+          <h2>Built for Every Role</h2>
+          <p>
+            A tailored experience with specific access privileges and features designed for the unique roles in your institution.
+          </p>
+        </div>
+
+        <div className="stakeholders-tabs-wrap">
+          {stakeholders.map((s) => (
+            <button
+              key={s.id}
+              className={`stakeholder-tab ${activeStakeholder === s.id ? 'active' : ''}`}
+              onClick={() => setActiveStakeholder(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="stakeholder-display">
+          <div className="stakeholder-text">
+            <h3>{stakeholders.find(s => s.id === activeStakeholder)?.title}</h3>
+            <p className="desc">{stakeholders.find(s => s.id === activeStakeholder)?.desc}</p>
+            <ul>
+              {stakeholders.find(s => s.id === activeStakeholder)?.points.map((p, idx) => (
+                <li key={idx}>
+                  <CheckCircle size={20} />
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="stakeholder-preview">
+            <img 
+              src={stakeholders.find(s => s.id === activeStakeholder)?.screenshot} 
+              alt={`${activeStakeholder} screenshot`} 
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Integrations Grid Section */}
+      <section className="integrations-section">
+        <div className="section-header">
+          <h2>Centralized Integrations</h2>
+          <p>We connect with standard third-party tools to extend the capability of your digital campus.</p>
+        </div>
+
+        <div className="integrations-grid">
+          <div className="integration-card">
+            <div className="integration-icon-wrap">
+              <Layers size={32} style={{ color: '#a855f7' }} />
+            </div>
+            <h3>Tally Accounts</h3>
+            <p>Sync all fee collections, refunds, and bank entries with accounting Ledgers.</p>
+          </div>
+          <div className="integration-card">
+            <div className="integration-icon-wrap">
+              <Monitor size={32} style={{ color: '#fcb900' }} />
+            </div>
+            <h3>Biometric Devices</h3>
+            <p>Integrate Hikvision, Essl, and RFID cards for teacher and student check-ins.</p>
+          </div>
+          <div className="integration-card">
+            <div className="integration-icon-wrap">
+              <BookOpen size={32} style={{ color: '#3b82f6' }} />
+            </div>
+            <h3>UDISE+ Reporting</h3>
+            <p>Export pre-formatted CSV and Excel worksheets ready for government compliance uploads.</p>
+          </div>
+          <div className="integration-card">
+            <div className="integration-icon-wrap">
+              <TrendingUp size={32} style={{ color: '#22c55e' }} />
+            </div>
+            <h3>Razorpay / Paytm</h3>
+            <p>Offer transparent online payment methods for students via netbanking, cards, or UPI.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="faq-section">
+        <div className="section-header">
+          <h2>Frequently Asked Questions</h2>
+          <p>Find quick answers to common queries regarding security, integration, and setup.</p>
+        </div>
+
+        <div className="faq-wrap">
+          <details className="faq-item">
+            <summary>
+              Is the system NEP 2020 and CBCS ready?
+              <ChevronDown size={20} className="faq-icon" />
+            </summary>
+            <div className="faq-answer">
+              Yes, PranganPro fully supports the National Education Policy (NEP 2020) and Choice Based Credit System (CBCS), enabling your institution to configure outcome-based curriculums, elective selections, and credit transfers.
+            </div>
+          </details>
+
+          <details className="faq-item">
+            <summary>
+              Can we synchronize biometric hardware directly?
+              <ChevronDown size={20} className="faq-icon" />
+            </summary>
+            <div className="faq-answer">
+              Absolutely. Our system features background sync scripts that pull raw logs from Hikvision, Essl, and general RFID systems, updating student/staff databases instantly.
+            </div>
+          </details>
+
+          <details className="faq-item">
+            <summary>
+              How secure is the financial transaction log?
+              <ChevronDown size={20} className="faq-icon" />
+            </summary>
+            <div className="faq-answer">
+              Every fee transaction is logged securely. The integration with Razorpay/Paytm processes details through PCI-DSS compliant channels, and any manual edits in ledgers leave audit trails.
+            </div>
+          </details>
+
+          <details className="faq-item">
+            <summary>
+              Does it auto-sync with accounting tools?
+              <ChevronDown size={20} className="faq-icon" />
+            </summary>
+            <div className="faq-answer">
+              Yes, we support direct sync files or API connectors for Tally Prime, ensuring that day-to-day balance reconciliations require zero manual keying.
+            </div>
+          </details>
+        </div>
+      </section>
+
+      {/* Call to Action Section */}
+      <section className="cta-section">
+        <div className="cta-box">
+          <h2>Ready to Digitize Your Campus?</h2>
+          <p>Set up a live walk-through with our software consultants and see the transformation in actions.</p>
+          <Link href="/book-demo">
+            <button className="hero-primary">Get Started Now</button>
+          </Link>
+        </div>
+      </section>
+
+
+
+      {/* VanillaTilt Loader and Initialization Script */}
+      <Script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js"
+        strategy="lazyOnload"
+        onLoad={() => {
+          const VanillaTilt = (window as any).VanillaTilt;
+          if (VanillaTilt) {
+            VanillaTilt.init(document.querySelectorAll(".hero-card"), {
+              max: 10,
+              speed: 400,
+              glare: true,
+              "max-glare": 0.3
+            });
+          }
+        }}
+      />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { collection, onSnapshot, addDoc, query, where, doc, updateDoc, writeBatc
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useCurrentStudent, useCurrentPrincipal } from '@/hooks/use-current-user';
+import { useChatScroll } from '@/hooks/use-chat-scroll';
 import { useToast } from '@/hooks/use-toast';
 import type { Teacher, PrincipalMessage, DirectMessage } from '@/lib/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -73,7 +74,6 @@ export default function StudentCommunicationPage() {
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
   const principalChatTextareaRef = useRef<HTMLTextAreaElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -150,9 +150,7 @@ export default function StudentCommunicationPage() {
     }
   };
 
-  useEffect(() => {
-    chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [threadWithPrincipal]);
+  const { ref: chatScrollRef } = useChatScroll([threadWithPrincipal, activeTab]);
 
   const prevPrincipalThreadLenRef = useRef<number | null>(null);
   useEffect(() => {
@@ -294,7 +292,6 @@ export default function StudentCommunicationPage() {
   const [directChatSending, setDirectChatSending] = useState(false);
   const [pendingDirectAttachment, setPendingDirectAttachment] = useState<File | null>(null);
   const [cameraForDirect, setCameraForDirect] = useState(false);
-  const directChatScrollRef = useRef<HTMLDivElement>(null);
   const directChatTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [directMessagesFrom, setDirectMessagesFrom] = useState<DirectMessage[]>([]);
@@ -406,9 +403,7 @@ export default function StudentCommunicationPage() {
     }
   };
 
-  useEffect(() => {
-    directChatScrollRef.current?.scrollTo({ top: directChatScrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [threadDirect]);
+  const { ref: directChatScrollRef } = useChatScroll([threadDirect, selectedDirectConversation?.id]);
 
   const prevDirectThreadLenRef = useRef<number | null>(null);
   useEffect(() => {

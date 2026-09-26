@@ -16,7 +16,8 @@ import {
   History,
   ClipboardList,
   MessageSquare,
-  Send
+  Send,
+  UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
@@ -294,6 +295,26 @@ export default function AssetManagerDashboardPage() {
               <CardContent className="pt-2 flex-grow">
                 <p className="text-sm text-muted-foreground">
                   Transfer assets by cataloging source department, target destination, condition, and quantities.
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/asset-manager-dashboard/profile">
+            <Card className="cursor-pointer border border-border/80 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:border-violet-500/50 hover:bg-violet-500/5 group relative overflow-hidden h-full flex flex-col justify-between">
+              <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-violet-500/15 to-fuchsia-500/15 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500" />
+              <CardHeader className="flex flex-row items-center gap-4 pb-2">
+                <div className="p-3 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-600 group-hover:text-white transition-colors duration-300">
+                  <UserCheck className="h-6 w-6" />
+                </div>
+                <div className="space-y-0.5">
+                  <CardTitle className="text-lg font-bold group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">My Profile</CardTitle>
+                  <CardDescription className="text-xs">Account details & college settings</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2 flex-grow">
+                <p className="text-sm text-muted-foreground">
+                  View and manage your profile photo, contact email, and institutional details.
                 </p>
               </CardContent>
             </Card>

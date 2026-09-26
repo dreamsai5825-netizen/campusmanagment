@@ -17,8 +17,14 @@ import {
   BookUp,
   Edit,
   Building2,
+  CalendarOff,
+  Calendar as CalendarIcon,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,10 +65,10 @@ import {
 } from '@/components/ui/card';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, deleteDoc, updateDoc, collection, setDoc, query, where } from 'firebase/firestore';
-import type { Teacher, Class, Subject, College } from '@/lib/types';
+import type { Teacher, Class, Subject, College, TeacherLeave } from '@/lib/types';
 import { getClassSubjectsDisplay, getTeacherSubjectsDisplay } from '@/lib/subject-utils';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
 import { useDashboardPath } from '@/hooks/use-dashboard-path';
@@ -98,6 +104,23 @@ export default function TeacherProfilePage({
   
   const [roles, setRoles] = useState<string[]>([]);
   const [roleInput, setRoleInput] = useState('');
+
+  // Leave Management States
+  const [leaves, setLeaves] = useState<TeacherLeave[]>([]);
+  const [isLogLeaveDialogOpen, setIsLogLeaveDialogOpen] = useState(false);
+  const [isEditQuotaDialogOpen, setIsEditQuotaDialogOpen] = useState(false);
+  const [leaveQuotaInput, setLeaveQuotaInput] = useState('12');
+  const [savingQuota, setSavingQuota] = useState(false);
+  const [savingLeave, setSavingLeave] = useState(false);
+
+  const [leaveForm, setLeaveForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    typeCategory: 'Casual Leave (CL)',
+    customTypeName: '',
+    isHalfDay: false,
+    halfDaySession: 'First Half (Morning)' as 'First Half (Morning)' | 'Second Half (Afternoon)',
+    reason: '',
+  });
 
 
   useEffect(() => {
@@ -154,6 +177,174 @@ export default function TeacherProfilePage({
 
     return () => unsubAssigned();
   }, [teacherId, allClasses]);
+
+  // Subscribe to Teacher Leaves
+  useEffect(() => {
+    if (!teacherId) return;
+    const qLeaves = query(collection(db, 'teachers', teacherId, 'leaves'));
+    const unsubLeaves = onSnapshot(qLeaves, (snapshot) => {
+      const list = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })) as TeacherLeave[];
+      list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setLeaves(list);
+    });
+    return () => unsubLeaves();
+  }, [teacherId]);
+
+  const DEFAULT_LEAVE_QUOTAS = useMemo<Record<string, number>>(() => ({
+    'Casual Leave (CL)': 12,
+    'Medical Leave (ML)': 8,
+    'Loss of Pay (LOP)': 12,
+    'Earned Leave (EL)': 10,
+    'Duty Leave (OD)': 5,
+  }), []);
+
+  const categoryQuotas: Record<string, number> = useMemo(() => {
+    return { ...DEFAULT_LEAVE_QUOTAS, ...(teacher?.leaveQuotas ?? {}) };
+  }, [DEFAULT_LEAVE_QUOTAS, teacher?.leaveQuotas]);
+
+  const [categoryQuotaForm, setCategoryQuotaForm] = useState<Record<string, number>>({});
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatDays, setNewCatDays] = useState('');
+
+  // Compute Category-wise Breakdown
+  const categoryBreakdown = useMemo(() => {
+    const categories = Array.from(
+      new Set([...Object.keys(categoryQuotas), ...leaves.map((l) => l.type)])
+    );
+
+    const map: Record<string, { allotted: number; taken: number; balance: number }> = {};
+
+    categories.forEach((cat) => {
+      const allotted = categoryQuotas[cat] ?? 0;
+      const taken = leaves
+        .filter((l) => l.type === cat)
+        .reduce((sum, l) => sum + (l.duration ?? 1.0), 0);
+      const balance = Math.max(0, allotted - taken);
+      map[cat] = { allotted, taken, balance };
+    });
+
+    return map;
+  }, [categoryQuotas, leaves]);
+
+  // Overall totals across all categories
+  const overallTotals = useMemo(() => {
+    let totalAllotted = 0;
+    let totalTaken = 0;
+    Object.values(categoryBreakdown).forEach((item) => {
+      totalAllotted += item.allotted;
+      totalTaken += item.taken;
+    });
+    const totalBalance = Math.max(0, totalAllotted - totalTaken);
+    return { totalAllotted, totalTaken, totalBalance };
+  }, [categoryBreakdown]);
+
+  const openEditQuotaDialog = () => {
+    setCategoryQuotaForm({ ...categoryQuotas });
+    setNewCatName('');
+    setNewCatDays('');
+    setIsEditQuotaDialogOpen(true);
+  };
+
+  const handleAddCategoryQuota = () => {
+    if (!newCatName.trim()) return;
+    const days = parseFloat(newCatDays) || 0;
+    setCategoryQuotaForm((prev) => ({
+      ...prev,
+      [newCatName.trim()]: days,
+    }));
+    setNewCatName('');
+    setNewCatDays('');
+  };
+
+  const handleRemoveCategoryQuota = (catName: string) => {
+    setCategoryQuotaForm((prev) => {
+      const copy = { ...prev };
+      delete copy[catName];
+      return copy;
+    });
+  };
+
+  const handleSaveCategoryQuotas = async () => {
+    if (!teacher) return;
+    setSavingQuota(true);
+    try {
+      await updateDoc(doc(db, 'teachers', teacher.id), { leaveQuotas: categoryQuotaForm });
+      toast({
+        title: 'Category Quotas Saved',
+        description: `Leave category quotas updated for ${teacher.name}.`,
+      });
+      setIsEditQuotaDialogOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save leave quotas.' });
+    } finally {
+      setSavingQuota(false);
+    }
+  };
+
+  const handleLogLeave = async () => {
+    if (!teacher || !leaveForm.date) {
+      toast({ variant: 'destructive', title: 'Missing Date', description: 'Please select a leave date.' });
+      return;
+    }
+    setSavingLeave(true);
+    try {
+      const finalType =
+        leaveForm.typeCategory === 'Custom'
+          ? leaveForm.customTypeName.trim() || 'Custom Leave'
+          : leaveForm.typeCategory;
+
+      const duration = leaveForm.isHalfDay ? 0.5 : 1.0;
+      const leaveDocData: Omit<TeacherLeave, 'id'> = {
+        teacherId: teacher.id,
+        collegeId: teacher.collegeId,
+        date: leaveForm.date,
+        type: finalType,
+        duration,
+        ...(leaveForm.isHalfDay && { halfDaySession: leaveForm.halfDaySession }),
+        reason: leaveForm.reason.trim() || 'No reason specified',
+        createdAt: new Date().toISOString(),
+        appliedBy: principal?.name || 'Principal',
+      };
+
+      const newRef = doc(collection(db, 'teachers', teacher.id, 'leaves'));
+      await setDoc(newRef, leaveDocData);
+
+      toast({
+        title: 'Leave Logged Successfully',
+        description: `${finalType} (${duration === 0.5 ? '0.5 Day' : '1.0 Day'}) recorded on ${format(new Date(leaveForm.date), 'dd MMM yyyy')} for ${teacher.name}.`,
+      });
+
+      setLeaveForm({
+        date: new Date().toISOString().split('T')[0],
+        typeCategory: 'Casual Leave (CL)',
+        customTypeName: '',
+        isHalfDay: false,
+        halfDaySession: 'First Half (Morning)',
+        reason: '',
+      });
+      setIsLogLeaveDialogOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to record leave entry.' });
+    } finally {
+      setSavingLeave(false);
+    }
+  };
+
+  const handleDeleteLeave = async (leaveId: string) => {
+    if (!teacher) return;
+    try {
+      await deleteDoc(doc(db, 'teachers', teacher.id, 'leaves', leaveId));
+      toast({ title: 'Leave Entry Revoked', description: 'Leave entry deleted and balance restored.' });
+    } catch (err) {
+      console.error(err);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete leave entry.' });
+    }
+  };
 
   
   if (!teacher) {
@@ -730,6 +921,453 @@ export default function TeacherProfilePage({
                       </span>
                   </div>
               </CardContent>
+          </Card>
+
+          {/* Teacher Leave Management Card */}
+          <Card className="border-purple-200/60 shadow-sm">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20 pb-4 rounded-t-xl">
+              <div>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <CalendarOff className="h-5 w-5 text-purple-600" />
+                  Leave Record & Quota
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Track allotted leaves, half days, and leave balance for {teacher.name}.
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Edit Category Quotas Button */}
+                <Dialog open={isEditQuotaDialogOpen} onOpenChange={setIsEditQuotaDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={openEditQuotaDialog}
+                      className="text-xs gap-1"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      Configure Quotas
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                      <DialogTitle>Configure Leave Category Quotas</DialogTitle>
+                      <DialogDescription>
+                        Set annual allotted days for each leave category for {teacher.name}.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-3 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Category Quotas List
+                        </Label>
+                        {Object.entries(categoryQuotaForm).map(([catName, days]) => (
+                          <div key={catName} className="flex items-center justify-between gap-3 border p-2.5 rounded-xl bg-card">
+                            <span className="text-sm font-semibold text-foreground flex-1">{catName}</span>
+                            <div className="flex items-center gap-2 w-32">
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={days}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setCategoryQuotaForm((prev) => ({ ...prev, [catName]: val }));
+                                }}
+                                className="h-8 text-right font-bold"
+                              />
+                              <span className="text-xs text-muted-foreground">days</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveCategoryQuota(catName)}
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Add Custom Category Quota Section */}
+                      <div className="border p-3 rounded-xl bg-muted/30 space-y-2">
+                        <Label className="text-xs font-semibold text-purple-800 dark:text-purple-300">
+                          + Add New Leave Category
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Category Name (e.g. Maternity Leave)"
+                            value={newCatName}
+                            onChange={(e) => setNewCatName(e.target.value)}
+                            className="h-8 text-xs flex-1"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Days"
+                            value={newCatDays}
+                            onChange={(e) => setNewCatDays(e.target.value)}
+                            className="h-8 text-xs w-20 text-right"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAddCategoryQuota}
+                            variant="secondary"
+                            className="h-8 text-xs shrink-0"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsEditQuotaDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveCategoryQuotas} disabled={savingQuota}>
+                        {savingQuota ? 'Saving...' : 'Save Category Quotas'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Log Leave Button */}
+                <Dialog open={isLogLeaveDialogOpen} onOpenChange={setIsLogLeaveDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white">
+                      <PlusCircle className="h-4 w-4" />
+                      Grant / Log Leave
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[460px]">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <CalendarOff className="h-5 w-5 text-purple-600" />
+                        Log Leave for {teacher.name}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Record a full day or half day leave entry.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-3">
+                      {/* Leave Date */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="leave-date">Leave Date</Label>
+                        <Input
+                          id="leave-date"
+                          type="date"
+                          value={leaveForm.date}
+                          onChange={(e) => setLeaveForm((prev) => ({ ...prev, date: e.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      {/* Full Day vs Half Day Switcher */}
+                      <div className="space-y-2 border p-3.5 rounded-xl bg-muted/30">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                          Leave Duration & Session
+                        </Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setLeaveForm((prev) => ({ ...prev, isHalfDay: false }))}
+                            className={`p-3 rounded-lg border text-left transition-all ${
+                              !leaveForm.isHalfDay
+                                ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 ring-1 ring-purple-600'
+                                : 'bg-card hover:border-muted-foreground/30'
+                            }`}
+                          >
+                            <div className="font-bold text-sm text-foreground">Full Day</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">Deducts 1.0 day</div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setLeaveForm((prev) => ({ ...prev, isHalfDay: true }))}
+                            className={`p-3 rounded-lg border text-left transition-all ${
+                              leaveForm.isHalfDay
+                                ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/40 ring-1 ring-purple-600'
+                                : 'bg-card hover:border-muted-foreground/30'
+                            }`}
+                          >
+                            <div className="font-bold text-sm text-foreground">Half Day 🌓</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">Deducts 0.5 day</div>
+                          </button>
+                        </div>
+
+                        {/* If Half Day -> Choose Session */}
+                        {leaveForm.isHalfDay && (
+                          <div className="space-y-2 pt-2 border-t mt-3">
+                            <Label className="text-xs font-medium">Select Half Day Session</Label>
+                            <RadioGroup
+                              value={leaveForm.halfDaySession}
+                              onValueChange={(val) =>
+                                setLeaveForm((prev) => ({
+                                  ...prev,
+                                  halfDaySession: val as 'First Half (Morning)' | 'Second Half (Afternoon)',
+                                }))
+                              }
+                              className="grid grid-cols-2 gap-2"
+                            >
+                              <div className="flex items-center space-x-2 border rounded-lg p-2.5 bg-card cursor-pointer">
+                                <RadioGroupItem value="First Half (Morning)" id="r1" />
+                                <Label htmlFor="r1" className="cursor-pointer text-xs font-medium">
+                                  🌅 First Half (Morning)
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2 border rounded-lg p-2.5 bg-card cursor-pointer">
+                                <RadioGroupItem value="Second Half (Afternoon)" id="r2" />
+                                <Label htmlFor="r2" className="cursor-pointer text-xs font-medium">
+                                  🌆 Second Half (Afternoon)
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Leave Type / Category Selector */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="leave-type">Leave Category / Type</Label>
+                        <Select
+                          value={leaveForm.typeCategory}
+                          onValueChange={(val) =>
+                            setLeaveForm((prev) => ({ ...prev, typeCategory: val }))
+                          }
+                        >
+                          <SelectTrigger id="leave-type">
+                            <SelectValue placeholder="Select leave category..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(categoryBreakdown).map(([catName, info]) => (
+                              <SelectItem key={catName} value={catName}>
+                                {catName} — (Bal: {info.balance.toFixed(1)} / {info.allotted} days)
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="Custom">✏️ Enter Custom Leave Type...</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Custom Leave Type Text Input if "Custom" is selected */}
+                      {leaveForm.typeCategory === 'Custom' && (
+                        <div className="space-y-1.5 bg-purple-50/60 dark:bg-purple-950/30 p-3 rounded-xl border border-purple-200">
+                          <Label htmlFor="custom-type-name" className="text-xs font-semibold text-purple-800 dark:text-purple-300">
+                            Enter Custom Leave Type Name
+                          </Label>
+                          <Input
+                            id="custom-type-name"
+                            placeholder="e.g. Quarantine Leave, Exam Duty, Sabbatical..."
+                            value={leaveForm.customTypeName}
+                            onChange={(e) =>
+                              setLeaveForm((prev) => ({ ...prev, customTypeName: e.target.value }))
+                            }
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {/* Reason / Remarks */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="leave-reason">Reason / Remarks</Label>
+                        <Input
+                          id="leave-reason"
+                          placeholder="e.g. Personal work, Doctor appointment, etc."
+                          value={leaveForm.reason}
+                          onChange={(e) => setLeaveForm((prev) => ({ ...prev, reason: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsLogLeaveDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleLogLeave} disabled={savingLeave} className="bg-purple-600 hover:bg-purple-700 text-white">
+                        {savingLeave ? 'Recording...' : 'Grant & Save Leave'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-6 pt-5">
+              {/* Overall Summary Stats Grid */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="border rounded-xl p-3.5 bg-blue-50/50 dark:bg-blue-950/20 border-blue-200">
+                  <div className="text-xs font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                    Total Allotted
+                  </div>
+                  <div className="text-2xl font-extrabold text-blue-700 dark:text-blue-400 mt-1">
+                    {overallTotals.totalAllotted.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">days</span>
+                  </div>
+                </div>
+
+                <div className="border rounded-xl p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200">
+                  <div className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                    Total Taken
+                  </div>
+                  <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-400 mt-1">
+                    {overallTotals.totalTaken.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">days</span>
+                  </div>
+                </div>
+
+                <div
+                  className={`border rounded-xl p-3.5 ${
+                    overallTotals.totalBalance > 5
+                      ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/20'
+                      : overallTotals.totalBalance > 0
+                      ? 'bg-orange-50/50 border-orange-200 dark:bg-orange-950/20'
+                      : 'bg-rose-50/50 border-rose-200 dark:bg-rose-950/20'
+                  }`}
+                >
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Total Balance
+                  </div>
+                  <div
+                    className={`text-2xl font-extrabold mt-1 ${
+                      overallTotals.totalBalance > 5
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : overallTotals.totalBalance > 0
+                        ? 'text-orange-700 dark:text-orange-400'
+                        : 'text-rose-700 dark:text-rose-400'
+                    }`}
+                  >
+                    {overallTotals.totalBalance.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">days</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category-Wise Quotas Breakdown Grid */}
+              <div className="space-y-2.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                  Category-Wise Quotas Breakdown
+                </Label>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {Object.entries(categoryBreakdown).map(([catName, item]) => (
+                    <div key={catName} className="border rounded-xl p-3 bg-card space-y-1.5 shadow-2xs">
+                      <div className="flex items-center justify-between text-xs font-bold text-foreground">
+                        <span className="truncate pr-1">{catName}</span>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-2 py-0 ${
+                            item.balance > 2
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : item.balance > 0
+                              ? 'bg-amber-50 text-amber-700 border-amber-300'
+                              : 'bg-rose-50 text-rose-700 border-rose-300'
+                          }`}
+                        >
+                          Bal: {item.balance.toFixed(1)}d
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-[11px] text-muted-foreground pt-1 border-t">
+                        <div>Alloted: <span className="font-semibold text-foreground">{item.allotted}</span></div>
+                        <div>Taken: <span className="font-semibold text-amber-600">{item.taken.toFixed(1)}</span></div>
+                        <div>Bal: <span className="font-semibold text-emerald-600">{item.balance.toFixed(1)}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Leave History List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b pb-2">
+                  <span>Leave Log History ({leaves.length})</span>
+                  <span>Duration / Type</span>
+                </div>
+
+                {leaves.length === 0 ? (
+                  <div className="text-center py-8 border rounded-xl bg-muted/20 text-muted-foreground">
+                    <CalendarOff className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm font-medium">No leave records entered yet.</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Use &quot;Grant / Log Leave&quot; above to record teacher leaves.
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    {leaves.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex items-center justify-between gap-3 text-sm p-3 rounded-xl border bg-card hover:bg-muted/30 transition-all"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-foreground">
+                              {format(new Date(item.date), 'dd MMM yyyy')}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] px-2 py-0 font-semibold ${
+                                item.duration === 0.5
+                                  ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300'
+                                  : 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300'
+                              }`}
+                            >
+                              {item.type}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 truncate max-w-sm">
+                            {item.reason}
+                            {item.halfDaySession && (
+                              <span className="ml-1 text-purple-600 dark:text-purple-400 font-medium">
+                                ({item.halfDaySession})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <span
+                              className={`text-sm font-extrabold px-2.5 py-1 rounded-lg ${
+                                item.duration === 0.5
+                                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                  : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                              }`}
+                            >
+                              {item.duration === 0.5 ? '0.5 Day' : '1.0 Day'}
+                            </span>
+                          </div>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Revoke Leave Entry?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will delete the leave entry for {format(new Date(item.date), 'dd MMM yyyy')} and credit {item.duration} day(s) back to {teacher.name}&apos;s balance.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteLeave(item.id)}>
+                                  Revoke Leave
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </CardContent>
           </Card>
         </div>
       </div>

@@ -28,7 +28,8 @@ import {
   ClipboardList,
   CalendarDays,
   FileClock,
-  MessageSquare
+  MessageSquare,
+  Fingerprint
 } from 'lucide-react';
 
 export default function CollegeDetailPage() {
@@ -490,6 +491,36 @@ export default function CollegeDetailPage() {
                 <p className="text-xs text-muted-foreground mt-1">Technical and facility queries</p>
                 <div className="mt-4 text-xs font-semibold text-primary group-hover:underline">
                   View Reported Issues →
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Card 13: Biometrics & Attendance */}
+          <Link href={`/super-admin-dashboard/colleges/${collegeId}/biometrics`}>
+            <Card className="h-full hover:border-primary/50 hover:shadow-lg transition-all duration-300 group cursor-pointer flex flex-col justify-between">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-bold group-hover:text-primary transition-colors">Biometric Logs</CardTitle>
+                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500 group-hover:bg-cyan-500 group-hover:text-white transition-all duration-300">
+                    <Fingerprint className="h-5 w-5" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2 flex flex-col justify-end flex-1">
+                {college?.biometricSettings?.enabled ? (
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-emerald-600">Active / Connected</p>
+                    <p className="text-muted-foreground truncate">IP: {college.biometricSettings.deviceIp}</p>
+                  </div>
+                ) : (
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-muted-foreground">Disabled</p>
+                    <p className="text-muted-foreground">Biometric sync is inactive</p>
+                  </div>
+                )}
+                <div className="mt-4 text-xs font-semibold text-primary group-hover:underline">
+                  View Biometric Logs →
                 </div>
               </CardContent>
             </Card>

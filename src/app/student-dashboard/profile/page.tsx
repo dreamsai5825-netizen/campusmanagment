@@ -32,12 +32,22 @@ import {
   Building2,
   Users,
   BookOpen,
+  CreditCard,
+  Coins,
+  Loader2,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { uploadProfilePhoto } from '@/lib/profile-photo';
-import { Loader2 } from 'lucide-react';
 
 export default function StudentProfilePage() {
   const student = useCurrentStudent();
@@ -58,6 +68,9 @@ export default function StudentProfilePage() {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [caste, setCaste] = useState('');
   const [subCaste, setSubCaste] = useState('');
+  const [payingOnline, setPayingOnline] = useState(false);
+  const [partialPaymentOpen, setPartialPaymentOpen] = useState(false);
+  const [customAmount, setCustomAmount] = useState<string>('');
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -149,6 +162,204 @@ export default function StudentProfilePage() {
   };
   const feeStatusInfo = getFeeStatus(student.fees?.status ?? '');
   const FeeStatusIcon = feeStatusInfo.icon;
+
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayOnline = async (requestedAmount?: number) => {
+    if (!student?.collegeId || !student?.id) return;
+    const balance = student.fees?.balance ?? 0;
+    if (balance <= 0) {
+      toast({
+        title: 'No Outstanding Balance',
+        description: 'Your fees are already fully paid.',
+      });
+      return;
+    }
+
+    const amountToPay = requestedAmount !== undefined ? requestedAmount : balance;
+    if (isNaN(amountToPay) || amountToPay <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Amount',
+        description: 'Please enter a valid payment amount greater than ₹0.',
+      });
+      return;
+    }
+
+    if (amountToPay > balance) {
+      toast({
+        variant: 'destructive',
+        title: 'Amount Exceeds Balance',
+        description: `You cannot pay more than the outstanding balance of ₹${balance.toLocaleString('en-IN')}.`,
+      });
+      return;
+    }
+
+    setPayingOnline(true);
+    try {
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast({
+          variant: 'destructive',
+          title: 'SDK Load Error',
+          description: 'Failed to load Razorpay Payment Gateway script. Please check your internet connection.',
+        });
+        return;
+      }
+
+      // Fetch fresh college settings if not loaded yet
+      let collegeSettings = currentCollege;
+      if (!collegeSettings) {
+        collegeSettings = await getCollegeById(student.collegeId);
+        setCurrentCollege(collegeSettings);
+      }
+
+      const orderFetch = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collegeId: student.collegeId,
+          amountInRupees: amountToPay,
+          studentId: student.id,
+          studentName: student.name,
+          feeType: amountToPay < balance ? 'Partial Fee Payment' : 'Student Outstanding Fees',
+          collegeName: collegeSettings?.name,
+        }),
+      });
+
+      const orderRes = await orderFetch.json().catch(() => ({}));
+
+      if (!orderRes.success || !orderRes.orderId || !orderRes.keyId) {
+        toast({
+          variant: 'destructive',
+          title: 'Payment Gateway Notice',
+          description: orderRes.error || 'Online payment gateway is not configured for your institution. Please contact your administrator.',
+        });
+        return;
+      }
+
+      const options = {
+        key: orderRes.keyId,
+        amount: orderRes.amount,
+        currency: orderRes.currency || 'INR',
+        name: orderRes.collegeName || 'College Management System',
+        description: amountToPay < balance ? `Partial Fee Payment (₹${amountToPay.toLocaleString('en-IN')})` : 'Outstanding Fee Collection',
+        order_id: orderRes.orderId,
+        handler: async function (response: any) {
+          toast({
+            title: 'Verifying Transaction...',
+            description: 'Authenticating payment signature with Razorpay...',
+          });
+
+          const verifyFetch = await fetch('/api/razorpay/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              collegeId: student.collegeId,
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+              studentId: student.id,
+              amountPaid: amountToPay,
+              receiptNumber: response.razorpay_payment_id,
+              remarks: `Razorpay Online ${amountToPay < balance ? 'Partial ' : ''}Payment for Student ID: ${student.studentId || student.id}`,
+            }),
+          });
+
+          const verifyRes = await verifyFetch.json().catch(() => ({}));
+
+          if (verifyRes.success) {
+            // Update student fee record directly in Firestore
+            try {
+              const existingFees = student.fees;
+              const currentPaid = existingFees?.paid ?? 0;
+              const currentTotal = existingFees?.totalFees ?? (currentPaid + balance);
+              const newPaid = currentPaid + amountToPay;
+              const newBalance = Math.max(0, currentTotal - newPaid);
+              const newStatus = newBalance <= 0 ? 'Paid' : 'Partially Paid';
+              const newPaymentRecord = {
+                id: response.razorpay_payment_id,
+                amount: amountToPay,
+                date: new Date().toISOString(),
+                method: 'Online' as const,
+                receiptNumber: response.razorpay_payment_id,
+                remarks: `Razorpay Online ${amountToPay < balance ? 'Partial ' : ''}Payment (Order: ${response.razorpay_order_id})`,
+              };
+              const updatedPaymentHistory = [...(existingFees?.paymentHistory ?? []), newPaymentRecord];
+
+              await updateDoc(doc(db, 'students', student.id), {
+                'fees.paid': newPaid,
+                'fees.balance': newBalance,
+                'fees.status': newStatus,
+                'fees.paymentHistory': updatedPaymentHistory,
+              });
+            } catch (updateErr) {
+              console.error('Client Firestore update error:', updateErr);
+            }
+
+            setPartialPaymentOpen(false);
+            setCustomAmount('');
+
+            toast({
+              title: 'Payment Complete! 🎉',
+              description: `Paid ₹${amountToPay.toLocaleString('en-IN')}. Transaction ID: ${response.razorpay_payment_id}`,
+            });
+          } else {
+            toast({
+              variant: 'destructive',
+              title: 'Verification Failed',
+              description: verifyRes.error || 'Payment signature verification failed.',
+            });
+          }
+        },
+        prefill: {
+          name: student.name || 'Student',
+          email: student.email || undefined,
+          contact: student.phone ? student.phone.replace(/[^0-9]/g, '').slice(-10) : undefined,
+        },
+        theme: {
+          color: '#0284c7',
+        },
+        modal: {
+          ondismiss: function () {
+            setPayingOnline(false);
+          },
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        console.error('Razorpay payment failed:', response.error);
+        toast({
+          variant: 'destructive',
+          title: 'Payment Incomplete',
+          description: response.error?.description || 'The transaction was cancelled or failed.',
+        });
+      });
+      rzp.open();
+    } catch (err: any) {
+      console.error('Error initiating Razorpay checkout:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Checkout Error',
+        description: err.message || 'Failed to initiate Razorpay checkout.',
+      });
+    } finally {
+      setPayingOnline(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -400,7 +611,7 @@ export default function StudentProfilePage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-sky-500/20 shadow-xs">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Landmark className="h-5 w-5 text-primary" />
@@ -420,11 +631,48 @@ export default function StudentProfilePage() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Balance</span>
-              <span className="font-bold text-lg">
-                ${(student.fees?.balance ?? 0).toLocaleString()}
+              <span className="text-muted-foreground">Balance Outstanding</span>
+              <span className="font-bold text-lg text-foreground">
+                ₹{(student.fees?.balance ?? 0).toLocaleString('en-IN')}
               </span>
             </div>
+
+            {(student.fees?.balance ?? 0) > 0 && (
+              <div className="space-y-2 pt-2">
+                <Button
+                  type="button"
+                  onClick={() => handlePayOnline()}
+                  disabled={payingOnline}
+                  className="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs gap-2 shadow-sm"
+                >
+                  {payingOnline ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Opening Payment Gateway...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4" />
+                      Pay Full Outstanding (₹{(student.fees?.balance ?? 0).toLocaleString('en-IN')})
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCustomAmount('');
+                    setPartialPaymentOpen(true);
+                  }}
+                  disabled={payingOnline}
+                  className="w-full border-sky-500/40 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-300 dark:hover:bg-sky-950 font-semibold text-xs gap-2"
+                >
+                  <Coins className="h-4 w-4 text-sky-600" />
+                  Pay Partial / Custom Amount
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
         <Link href="/student-dashboard/attendance" className="block">
@@ -483,6 +731,118 @@ export default function StudentProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Partial Payment Dialog Modal */}
+      <Dialog open={partialPaymentOpen} onOpenChange={setPartialPaymentOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-sky-600" />
+              Pay Partial Amount
+            </DialogTitle>
+            <DialogDescription>
+              Enter the amount you would like to pay towards your outstanding fees.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/50 p-3 flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Current Total Outstanding:</span>
+              <span className="font-bold text-foreground text-base">
+                ₹{(student.fees?.balance ?? 0).toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {/* Quick Amount Suggestion Chips */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Quick Select Amount:</Label>
+              <div className="flex flex-wrap gap-2">
+                {[1000, 2000, 5000, 10000, 20000]
+                  .filter((amt) => amt < (student.fees?.balance ?? 0))
+                  .map((amt) => (
+                    <Button
+                      key={amt}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 px-2.5 hover:border-sky-500 hover:text-sky-600"
+                      onClick={() => setCustomAmount(amt.toString())}
+                    >
+                      ₹{amt.toLocaleString('en-IN')}
+                    </Button>
+                  ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-amount">Enter Payment Amount (₹)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold text-base">₹</span>
+                <Input
+                  id="custom-amount"
+                  type="number"
+                  min="1"
+                  max={student.fees?.balance ?? 0}
+                  placeholder="e.g. 5000"
+                  className="pl-8 text-base font-semibold"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {Number(customAmount) > 0 && (
+              <div className="text-xs text-muted-foreground space-y-1.5 border-t pt-3">
+                <div className="flex justify-between">
+                  <span>Amount to Pay Now:</span>
+                  <span className="font-bold text-sky-600 text-sm">
+                    ₹{Number(customAmount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Remaining Balance After Payment:</span>
+                  <span className="font-semibold text-foreground">
+                    ₹{Math.max(0, (student.fees?.balance ?? 0) - Number(customAmount)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setPartialPaymentOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                payingOnline ||
+                !Number(customAmount) ||
+                Number(customAmount) <= 0 ||
+                Number(customAmount) > (student.fees?.balance ?? 0)
+              }
+              onClick={() => handlePayOnline(Number(customAmount))}
+              className="bg-sky-600 hover:bg-sky-700 text-white gap-2 font-semibold"
+            >
+              {payingOnline ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Opening Gateway...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4" />
+                  Proceed to Pay ₹{Number(customAmount || 0).toLocaleString('en-IN')}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

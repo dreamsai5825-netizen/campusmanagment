@@ -31,7 +31,7 @@ export function AcademicYearBackfill() {
     startedRef.current = true;
 
     (async () => {
-      const result = await runAcademicYearBackfill(currentAcademicYear);
+      const result = await runAcademicYearBackfill(currentAcademicYear, principal.collegeId);
       if (result.error) {
         console.warn('Academic year backfill failed:', result.error);
         startedRef.current = false;

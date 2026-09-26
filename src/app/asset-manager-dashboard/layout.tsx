@@ -17,6 +17,7 @@ import {
   User,
   Send,
   FileSpreadsheet,
+  Palette,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -67,6 +68,7 @@ const navItems = [
   { href: '/asset-manager-dashboard/allocations', icon: ClipboardList, label: 'Allocations' },
   { href: '/asset-manager-dashboard/maintenance', icon: Wrench, label: 'Maintenance' },
   { href: '/asset-manager-dashboard/reports', icon: FileSpreadsheet, label: 'Reports' },
+  { href: '/asset-manager-dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function AssetManagerDashboardLayout({
@@ -390,7 +392,7 @@ export default function AssetManagerDashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/'); }}>
+              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/login'); }}>
                 <LogOut className="size-5" />
                 <span>Logout</span>
               </SidebarMenuButton>

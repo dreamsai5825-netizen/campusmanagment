@@ -1,7 +1,7 @@
 import { initializeApp, getApps, cert, applicationDefault, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
 let adminApp: App | null = null;
@@ -13,16 +13,23 @@ function getFirebaseAdmin() {
     adminApp = existing[0] as App;
     return adminApp;
   }
-  // Option 1: Path to service account JSON file (filename can be anything, e.g. studio-xxx-firebase-adminsdk-xxx.json)
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (credPath) {
+  // Option 1: Path to service account JSON file (from env or workspace root)
+  const candidateFiles = [
+    process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    'cms-011-firebase-adminsdk.json',
+    'studio-7522226027-4e1c9-firebase-adminsdk-fbsvc-8134658622.json'
+  ].filter(Boolean) as string[];
+
+  for (const file of candidateFiles) {
     try {
-      const absPath = resolve(process.cwd(), credPath);
-      const key = JSON.parse(readFileSync(absPath, 'utf8'));
-      adminApp = initializeApp({ credential: cert(key) });
-      return adminApp;
+      const absPath = resolve(process.cwd(), file);
+      if (existsSync(absPath)) {
+        const key = JSON.parse(readFileSync(absPath, 'utf8'));
+        adminApp = initializeApp({ credential: cert(key) });
+        return adminApp;
+      }
     } catch (e) {
-      console.warn('Firebase Admin: GOOGLE_APPLICATION_CREDENTIALS file failed', e);
+      console.warn(`Firebase Admin: ${file} load failed`, e);
     }
   }
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;

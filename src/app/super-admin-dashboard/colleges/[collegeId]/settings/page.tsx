@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { College } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -10,8 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Save, ShieldAlert, Users, Landmark, BadgePercent, HelpCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, Save, ShieldAlert, Users, Landmark, BadgePercent, HelpCircle, Calendar, Fingerprint, Network, Eye, EyeOff, CreditCard, Key, Lock, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 
 export default function CollegeSettingsPage() {
   const params = useParams();
@@ -33,6 +34,22 @@ export default function CollegeSettingsPage() {
   const [expiryDate, setExpiryDate] = useState('');
   const [paymentLink, setPaymentLink] = useState('');
 
+  // Biometric Settings States
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricDeviceIp, setBiometricDeviceIp] = useState('');
+  const [biometricUsername, setBiometricUsername] = useState('');
+  const [biometricPassword, setBiometricPassword] = useState('');
+  const [biometricMappedDept, setBiometricMappedDept] = useState('');
+  const [showBiometricPassword, setShowBiometricPassword] = useState(false);
+  const [savingBiometrics, setSavingBiometrics] = useState(false);
+
+  // Razorpay Gateway Settings States
+  const [razorpayEnabled, setRazorpayEnabled] = useState(false);
+  const [razorpayKeyId, setRazorpayKeyId] = useState('');
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState('');
+  const [showRazorpaySecret, setShowRazorpaySecret] = useState(false);
+  const [savingRazorpay, setSavingRazorpay] = useState(false);
+
   // Counters for calculation
   const [studentCount, setStudentCount] = useState(0);
   const [teacherCount, setTeacherCount] = useState(0);
@@ -45,25 +62,42 @@ export default function CollegeSettingsPage() {
   useEffect(() => {
     if (!collegeId) return;
 
-    const fetchData = async () => {
-      try {
-        // Fetch college
-        const collegeSnap = await getDoc(doc(db, 'colleges', collegeId));
-        if (collegeSnap.exists()) {
-          const data = collegeSnap.data();
-          setCollege({ ...data, id: collegeSnap.id } as College);
-          
-          const billing = (data as any).billing;
-          if (billing) {
-            setModule(billing.module || 'full-scale');
-            setOneTimeFee(billing.oneTimeFee || 0);
-            setAmount(billing.amount || 0);
-            setPurchaseDate(billing.purchaseDate || '');
-            setExpiryDate(billing.expiryDate || '');
-            setPaymentLink(billing.paymentLink || '');
-          }
+    // Listen to college changes in real-time
+    const unsubscribeCollege = onSnapshot(doc(db, 'colleges', collegeId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setCollege({ ...data, id: snap.id } as College);
+        
+        const billing = (data as any).billing;
+        if (billing) {
+          setModule(billing.module || 'full-scale');
+          setOneTimeFee(billing.oneTimeFee || 0);
+          setAmount(billing.amount || 0);
+          setPurchaseDate(billing.purchaseDate || '');
+          setExpiryDate(billing.expiryDate || '');
+          setPaymentLink(billing.paymentLink || '');
         }
 
+        const biometrics = (data as any).biometricSettings;
+        if (biometrics) {
+          setBiometricEnabled(biometrics.enabled || false);
+          setBiometricDeviceIp(biometrics.deviceIp || '');
+          setBiometricUsername(biometrics.username || '');
+          setBiometricPassword(biometrics.password || '');
+          setBiometricMappedDept(biometrics.mappedDepartment || '');
+        }
+
+        const razorpay = (data as any).razorpaySettings;
+        if (razorpay) {
+          setRazorpayEnabled(razorpay.enabled || false);
+          setRazorpayKeyId(razorpay.keyId || '');
+          setRazorpayKeySecret(razorpay.keySecret || '');
+        }
+      }
+    });
+
+    const fetchData = async () => {
+      try {
         // Fetch counts
         const studentQuery = query(collection(db, 'students'), where('collegeId', '==', collegeId));
         const studentSnap = await getDocs(studentQuery);
@@ -85,6 +119,10 @@ export default function CollegeSettingsPage() {
     };
 
     fetchData();
+
+    return () => {
+      unsubscribeCollege();
+    };
   }, [collegeId]);
 
   const totalUsers = studentCount + teacherCount + principalCount;
@@ -120,6 +158,68 @@ export default function CollegeSettingsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveBiometrics = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingBiometrics(true);
+    try {
+      await updateDoc(doc(db, 'colleges', collegeId), {
+        biometricSettings: {
+          enabled: biometricEnabled,
+          deviceIp: biometricDeviceIp,
+          username: biometricUsername,
+          password: biometricPassword,
+          mappedDepartment: biometricMappedDept,
+          updatedAt: new Date().toISOString()
+        }
+      });
+
+      toast({
+        title: 'Biometric Integration Saved',
+        description: 'Local biometric device credentials saved successfully.'
+      });
+    } catch (error) {
+      console.error('Error saving biometric settings:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Save Failed',
+        description: 'Failed to save biometric settings.'
+      });
+    } finally {
+      setSavingBiometrics(false);
+    }
+  };
+
+  const handleSaveRazorpaySettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!collegeId) return;
+
+    setSavingRazorpay(true);
+    try {
+      await updateDoc(doc(db, 'colleges', collegeId), {
+        razorpaySettings: {
+          enabled: razorpayEnabled,
+          keyId: razorpayKeyId.trim(),
+          keySecret: razorpayKeySecret.trim(),
+          updatedAt: new Date().toISOString(),
+        },
+      });
+
+      toast({
+        title: 'Razorpay Settings Saved',
+        description: 'Updated institution Razorpay API credentials successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error saving Razorpay settings:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Save Failed',
+        description: error.message || 'Failed to update Razorpay credentials.',
+      });
+    } finally {
+      setSavingRazorpay(false);
     }
   };
 
@@ -391,6 +491,209 @@ export default function CollegeSettingsPage() {
             <Button type="submit" disabled={saving} className="gap-2 shrink-0">
               <Save className="h-4 w-4" />
               {saving ? 'Saving...' : 'Save Configuration'}
+            </Button>
+          </CardFooter>
+        </Card>
+      </form>
+
+      {/* Biometric Attendance Settings Card */}
+      <form onSubmit={handleSaveBiometrics}>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  <Fingerprint className="h-5 w-5 text-primary" />
+                  Biometric Attendance Integration
+                </CardTitle>
+                <CardDescription>
+                  Configure on-premise Hikvision biometric terminal settings for faculty logging.
+                </CardDescription>
+              </div>
+              <Switch
+                checked={biometricEnabled}
+                onCheckedChange={setBiometricEnabled}
+                id="biometric-toggle"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 border-t pt-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="biometric-ip">Device IP Address</Label>
+                <div className="relative">
+                  <Network className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="biometric-ip"
+                    placeholder="e.g. 192.168.1.64"
+                    value={biometricDeviceIp}
+                    onChange={(e) => setBiometricDeviceIp(e.target.value)}
+                    className="pl-9"
+                    required={biometricEnabled}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">The local static IP address of the terminal on campus Wi-Fi.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="biometric-username">Device Username</Label>
+                <Input
+                  id="biometric-username"
+                  placeholder="admin"
+                  value={biometricUsername}
+                  onChange={(e) => setBiometricUsername(e.target.value)}
+                  required={biometricEnabled}
+                />
+                <p className="text-xs text-muted-foreground">Username for device Web interface / ISAPI access.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="biometric-password">Device Password</Label>
+                <div className="relative">
+                  <Input
+                    id="biometric-password"
+                    type={showBiometricPassword ? 'text' : 'password'}
+                    placeholder="Enter device password..."
+                    value={biometricPassword}
+                    onChange={(e) => setBiometricPassword(e.target.value)}
+                    required={biometricEnabled}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowBiometricPassword(!showBiometricPassword)}
+                  >
+                    {showBiometricPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">
+                      {showBiometricPassword ? 'Hide password' : 'Show password'}
+                    </span>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Secure password used to authenticate API requests.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="biometric-mapped-dept">Mapped Department on Terminal</Label>
+                <select
+                  id="biometric-mapped-dept"
+                  value={biometricMappedDept}
+                  onChange={(e) => setBiometricMappedDept(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-md border bg-background text-foreground"
+                  required={biometricEnabled}
+                >
+                  <option value="">-- Select Department --</option>
+                  <option value="ADMINISTRATOR">ADMINISTRATOR</option>
+                  <option value="DEGREE">DEGREE</option>
+                  <option value="PARAMEDICAL">PARAMEDICAL</option>
+                  <option value="NURSING">NURSING</option>
+                  <option value="General Faculty">General Faculty</option>
+                  <option value="ALL">ALL (No Filter)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">Isolates biometric sync: Only members of this terminal department will be imported.</p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="bg-muted/30 border-t flex justify-end p-5 rounded-b-xl">
+            <Button type="submit" disabled={savingBiometrics} className="gap-2 shrink-0">
+              <Save className="h-4 w-4" />
+              {savingBiometrics ? 'Saving...' : 'Save Biometrics'}
+            </Button>
+          </CardFooter>
+        </Card>
+      </form>
+
+      {/* Razorpay Online Payment Gateway Integration Card */}
+      <form onSubmit={handleSaveRazorpaySettings}>
+        <Card className="border-sky-500/30 dark:border-sky-800/40 shadow-sm">
+          <CardHeader className="bg-sky-500/5 dark:bg-sky-950/20 border-b pb-4 rounded-t-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg font-bold text-sky-950 dark:text-sky-100">
+                  <CreditCard className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                  Razorpay Online Payment Gateway Integration
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Configure API Key ID & Secret Key for collecting online fees directly into this institution's bank account.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2 bg-background border px-3 py-1.5 rounded-full shadow-xs">
+                <Switch
+                  id="razorpay-super-switch"
+                  checked={razorpayEnabled}
+                  onCheckedChange={setRazorpayEnabled}
+                />
+                <Label htmlFor="razorpay-super-switch" className="text-xs font-semibold cursor-pointer">
+                  {razorpayEnabled ? 'Active' : 'Disabled'}
+                </Label>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="razorpay-super-key-id" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Key className="h-3.5 w-3.5 text-sky-600" />
+                  Razorpay Key ID
+                </Label>
+                <Input
+                  id="razorpay-super-key-id"
+                  placeholder="e.g. rzp_live_xxxxxxxxxxxx or rzp_test_xxxxxxxxxxxx"
+                  value={razorpayKeyId}
+                  onChange={(e) => setRazorpayKeyId(e.target.value)}
+                  className="font-mono text-xs"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Obtained from the college's Razorpay Account Dashboard.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="razorpay-super-key-secret" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5 text-sky-600" />
+                  Razorpay Key Secret
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="razorpay-super-key-secret"
+                    type={showRazorpaySecret ? 'text' : 'password'}
+                    placeholder="e.g. xxxxxxxxxxxxxxxxxxxxxxxx"
+                    value={razorpayKeySecret}
+                    onChange={(e) => setRazorpayKeySecret(e.target.value)}
+                    className="font-mono text-xs pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRazorpaySecret(!showRazorpaySecret)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showRazorpaySecret ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Encrypted & stored securely per institution tenant.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="bg-muted/30 border-t flex items-center justify-between p-5 rounded-b-xl">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <span>Payments route directly to institution bank account.</span>
+            </div>
+            <Button type="submit" disabled={savingRazorpay} className="bg-sky-600 hover:bg-sky-700 text-white gap-2 shrink-0">
+              <Save className="h-4 w-4" />
+              {savingRazorpay ? 'Saving Gateway...' : 'Save Razorpay Keys'}
             </Button>
           </CardFooter>
         </Card>

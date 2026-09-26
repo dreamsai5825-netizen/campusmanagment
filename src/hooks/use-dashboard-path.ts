@@ -13,6 +13,8 @@ export function useDashboardPath() {
       prefix = '/college-admin-dashboard';
     } else if (pathname.startsWith('/asset-manager-dashboard')) {
       prefix = '/asset-manager-dashboard';
+    } else if (pathname.startsWith('/account-manager-dashboard')) {
+      prefix = '/account-manager-dashboard';
     }
 
     if (!subpath || subpath === '/') {
@@ -29,6 +31,8 @@ export function useDashboardPath() {
     ? '/college-admin-dashboard'
     : pathname.startsWith('/asset-manager-dashboard')
     ? '/asset-manager-dashboard'
+    : pathname.startsWith('/account-manager-dashboard')
+    ? '/account-manager-dashboard'
     : '/admin-dashboard';
 
   return { getPath, prefix };

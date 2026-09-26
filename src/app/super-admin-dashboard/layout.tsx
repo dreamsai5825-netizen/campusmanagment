@@ -7,6 +7,8 @@ import {
   LayoutDashboard,
   LogOut,
   GraduationCap,
+  CalendarCheck,
+  Palette,
 } from 'lucide-react';
 
 import {
@@ -26,6 +28,8 @@ import { useAuth } from '@/contexts/auth-context';
 
 const navItems = [
   { href: '/super-admin-dashboard', icon: LayoutDashboard, label: 'Colleges' },
+  { href: '/super-admin-dashboard/demo-bookings', icon: CalendarCheck, label: 'Demo Bookings' },
+  { href: '/super-admin-dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function SuperAdminDashboardLayout({
@@ -85,7 +89,7 @@ export default function SuperAdminDashboardLayout({
                 className="justify-start gap-3 w-full cursor-pointer" 
                 onClick={async () => { 
                   await signOut(); 
-                  router.push('/'); 
+                  router.push('/login'); 
                 }}
               >
                 <LogOut className="size-5" />

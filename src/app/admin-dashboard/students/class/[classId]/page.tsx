@@ -17,7 +17,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { collection, onSnapshot, query, where, deleteDoc, doc, updateDoc, getDocs, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
-import type { Student, Class, Parent } from '@/lib/types';
+import type { Student, Class, Parent, College } from '@/lib/types';
 import { useAcademicYear } from '@/contexts/academic-year-context';
 import { useDashboardPath } from '@/hooks/use-dashboard-path';
 import { filterByAcademicYear } from '@/lib/academic-year-filter';
@@ -38,13 +38,14 @@ export default function ClassStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
 
   const studentsForYear = useMemo(
-    () => filterByAcademicYear(students, selectedAcademicYear),
-    [students, selectedAcademicYear]
+    () => classId === 'unmapped' ? students : filterByAcademicYear(students, selectedAcademicYear),
+    [students, selectedAcademicYear, classId]
   );
 
   const { toast } = useToast();
   const [allClasses, setAllClasses] = useState<Class[]>([]);
-  const [collegeName, setCollegeName] = useState<string>('CMS Portal');
+  const [college, setCollege] = useState<College | null>(null);
+  const collegeName = college?.name || 'Institution';
 
   // Fetch all classes in the college for Promote/Demote matching
   useEffect(() => {
@@ -56,20 +57,15 @@ export default function ClassStudentsPage() {
     return () => unsubscribe();
   }, [principal?.collegeId]);
 
-  // Fetch college name
+  // Fetch college data
   useEffect(() => {
     if (!principal?.collegeId) return;
-    const loadCollege = async () => {
-      try {
-        const collegeDoc = await getDoc(doc(db, 'colleges', principal.collegeId));
-        if (collegeDoc.exists()) {
-          setCollegeName(collegeDoc.data().name);
-        }
-      } catch (err) {
-        console.error("Error loading college info:", err);
+    const unsub = onSnapshot(doc(db, 'colleges', principal.collegeId), (docSnap) => {
+      if (docSnap.exists()) {
+        setCollege({ id: docSnap.id, ...docSnap.data() } as College);
       }
-    };
-    loadCollege();
+    });
+    return () => unsub();
   }, [principal?.collegeId]);
 
   const getNextClassName = (currentClass: string): string | null => {
@@ -310,13 +306,22 @@ export default function ClassStudentsPage() {
             .info-value { font-size: 14px; font-weight: 500; color: #111827; }
             .section-title { font-size: 14px; font-weight: bold; color: #1e3a8a; border-bottom: 1px dashed #cbd5e1; padding-bottom: 5px; margin: 30px 0 15px 0; text-transform: uppercase; }
             .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 60px; text-align: center; }
-            .sig-line { border-top: 1px solid #4b5563; margin-top: 50px; font-size: 12px; font-weight: 600; color: #4b5563; padding-top: 5px; }
+            .header-flex { display: flex; align-items: center; justify-content: center; gap: 20px; }
+            .college-logo { width: 70px; height: 70px; object-fit: contain; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1 class="college-name">${collegeName}</h1>
-            <h2 class="title">Student Profile Sheet</h2>
+            <div class="header-flex">
+              ${college?.logoUrl ? `<img src="${college.logoUrl}" class="college-logo" alt="Logo" />` : ''}
+              <div>
+                <h1 class="college-name">${collegeName}</h1>
+                ${college?.address ? `<p style="margin: 2px 0; font-size: 12px; color: #666;">${college.address}</p>` : ''}
+                ${college?.code ? `<p style="margin: 2px 0; font-size: 11px; font-weight: bold; color: #444;">CODE: ${college.code}</p>` : ''}
+                <h2 class="title">Student Profile Sheet</h2>
+              </div>
+              ${college?.logo2Url ? `<img src="${college.logo2Url}" class="college-logo" alt="Logo 2" />` : (college?.logoUrl ? '<div style="width: 70px;"></div>' : '')}
+            </div>
           </div>
           
           <div class="profile-section">
@@ -705,7 +710,8 @@ export default function ClassStudentsPage() {
             .info-value { font-size: 14px; font-weight: 500; color: #111827; }
             .section-title { font-size: 14px; font-weight: bold; color: #1e3a8a; border-bottom: 1px dashed #cbd5e1; padding-bottom: 5px; margin: 30px 0 15px 0; text-transform: uppercase; }
             .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 60px; text-align: center; }
-            .sig-line { border-top: 1px solid #4b5563; margin-top: 50px; font-size: 12px; font-weight: 600; color: #4b5563; padding-top: 5px; }
+            .header-flex { display: flex; align-items: center; justify-content: center; gap: 20px; }
+            .college-logo { width: 70px; height: 70px; object-fit: contain; }
           </style>
         </head>
         <body>
@@ -732,8 +738,16 @@ export default function ClassStudentsPage() {
         printHTML += `
           <div class="profile-page-container ${i < selectedStudents.length - 1 ? 'page-break' : ''}">
             <div class="header">
-              <h1 class="college-name">${collegeName}</h1>
-              <h2 class="title">Student Profile Sheet</h2>
+              <div class="header-flex">
+                ${college?.logoUrl ? `<img src="${college.logoUrl}" class="college-logo" alt="Logo" />` : ''}
+                <div>
+                  <h1 class="college-name">${collegeName}</h1>
+                  ${college?.address ? `<p style="margin: 2px 0; font-size: 12px; color: #666;">${college.address}</p>` : ''}
+                  ${college?.code ? `<p style="margin: 2px 0; font-size: 11px; font-weight: bold; color: #444;">CODE: ${college.code}</p>` : ''}
+                  <h2 class="title">Student Profile Sheet</h2>
+                </div>
+                ${college?.logo2Url ? `<img src="${college.logo2Url}" class="college-logo" alt="Logo 2" />` : (college?.logoUrl ? '<div style="width: 70px;"></div>' : '')}
+              </div>
             </div>
             
             <div class="profile-section">
@@ -870,6 +884,17 @@ export default function ClassStudentsPage() {
   useEffect(() => {
     if (!classId) return;
 
+    if (classId === 'unmapped') {
+      setStudentClass({
+        id: 'unmapped',
+        name: 'Unmapped Students',
+        code: '',
+        collegeId: principal?.collegeId || '',
+        academicYear: selectedAcademicYear,
+      } as any);
+      return;
+    }
+
     // Load the class
     const classUnsubscribe = onSnapshot(
       query(collection(db, 'classes'), where('id', '==', classId)),
@@ -881,14 +906,19 @@ export default function ClassStudentsPage() {
     );
 
     return () => classUnsubscribe();
-  }, [classId]);
+  }, [classId, principal?.collegeId, selectedAcademicYear]);
 
   useEffect(() => {
     if (!classId) return;
+    if (classId === 'unmapped' && !principal?.collegeId) return;
+
+    const q = classId === 'unmapped'
+      ? query(collection(db, 'students'), where('collegeId', '==', principal?.collegeId), where('classId', '==', ''))
+      : query(collection(db, 'students'), where('classId', '==', classId));
 
     // Load students in this class
     const studentsUnsubscribe = onSnapshot(
-      query(collection(db, 'students'), where('classId', '==', classId)),
+      q,
       (snapshot) => {
         const studentsData = snapshot.docs
           .map((d) => ({ ...d.data(), id: d.id } as Student))
@@ -904,7 +934,7 @@ export default function ClassStudentsPage() {
     );
 
     return () => studentsUnsubscribe();
-  }, [classId]);
+  }, [classId, principal?.collegeId]);
 
   const handleStudentClick = (studentId: string) => {
     router.push(getPath(`/students/${studentId}`));
@@ -954,24 +984,28 @@ export default function ClassStudentsPage() {
 
           {selectedIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1 hover:bg-primary/10 hover:text-primary"
-                onClick={handleBulkPromote}
-              >
-                <ChevronUp className="h-4 w-4" />
-                Promote
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1 hover:bg-primary/10 hover:text-primary"
-                onClick={handleBulkDemote}
-              >
-                <ChevronDown className="h-4 w-4" />
-                Demote
-              </Button>
+              {classId !== 'unmapped' && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 hover:bg-primary/10 hover:text-primary"
+                    onClick={handleBulkPromote}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                    Promote
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 hover:bg-primary/10 hover:text-primary"
+                    onClick={handleBulkDemote}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                    Demote
+                  </Button>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1083,31 +1117,35 @@ export default function ClassStudentsPage() {
                   className="mt-auto border-t p-2 flex justify-between items-center gap-1 bg-muted/10"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePromoteStudent(student);
-                    }}
-                    title="Promote"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
+                  {classId !== 'unmapped' && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePromoteStudent(student);
+                        }}
+                        title="Promote"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDemoteStudent(student);
-                    }}
-                    title="Demote"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDemoteStudent(student);
+                        }}
+                        title="Demote"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
 
                   <Button
                     variant="ghost"

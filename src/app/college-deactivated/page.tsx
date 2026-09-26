@@ -28,7 +28,7 @@ function CollegeDeactivatedContent() {
         const data = snap.data();
         if (data.status === 'active') {
           // If the college is reactivated, redirect to login
-          router.push('/');
+          router.push('/login');
         } else if (data.deactivationReason) {
           setReason(data.deactivationReason);
         }
@@ -42,7 +42,7 @@ function CollegeDeactivatedContent() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/');
+    router.push('/login');
   };
 
   return (

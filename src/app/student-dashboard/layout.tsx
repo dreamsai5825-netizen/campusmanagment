@@ -14,7 +14,8 @@ import {
   Megaphone,
   GraduationCap,
   MessageSquare,
-  AlertCircle
+  AlertCircle,
+  Palette
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -45,6 +46,7 @@ const navItems = [
   { href: '/student-dashboard/announcements', icon: Megaphone, label: 'Announcements' },
   { href: '/student-dashboard/communication', icon: MessageSquare, label: 'Communication' },
   { href: '/dashboard/complaints', icon: AlertCircle, label: 'Complaints' },
+  { href: '/student-dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function StudentDashboardLayout({
@@ -88,7 +90,7 @@ export default function StudentDashboardLayout({
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/');
+    router.push('/login');
   };
 
   return (

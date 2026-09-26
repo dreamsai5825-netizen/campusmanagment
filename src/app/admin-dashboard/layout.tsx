@@ -22,6 +22,8 @@ import {
   Clock,
   BarChart3,
   ClipboardList,
+  Palette,
+  Calculator,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -62,6 +64,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import type { Notification, College } from '@/lib/types';
+import { getCollegeById } from '@/lib/college-service';
 import { playNotificationSound } from '@/lib/notification-sound';
 import { AcademicYearProvider, useAcademicYear } from '@/contexts/academic-year-context';
 import {
@@ -148,6 +151,7 @@ const navItems = [
   { href: '/admin-dashboard/communication', icon: MessageSquare, label: 'Communication' },
   { href: '/admin-dashboard/complaints', icon: AlertCircle, label: 'Complaints' },
   { href: '/admin-dashboard/timetable', icon: Calendar, label: 'Timetable' },
+  { href: '/admin-dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function AdminDashboardLayout({
@@ -199,6 +203,10 @@ export default function AdminDashboardLayout({
         const data = snap.data();
         setCollegeStatus(data.status || 'active');
         setDeactivationReason(data.deactivationReason || '');
+
+        if (!data.code || data.code === '-' || data.code === '—' || String(data.code).trim() === '') {
+          getCollegeById(principal.collegeId);
+        }
         
         const billing = data.billing;
         if (billing && billing.expiryDate) {
@@ -475,7 +483,7 @@ export default function AdminDashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/'); }}>
+              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/login'); }}>
                 <LogOut className="size-5" />
                 <span>Logout</span>
               </SidebarMenuButton>

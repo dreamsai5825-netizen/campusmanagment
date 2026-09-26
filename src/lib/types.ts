@@ -1,15 +1,51 @@
-/** Institution (school/college) – one per tenant. */
+export type RazorpaySettings = {
+  enabled: boolean;
+  keyId: string;
+  keySecret: string;
+  /** When true, uses Razorpay Route multi-account settlement for child colleges. */
+  routeEnabled?: boolean;
+  updatedAt?: string;
+};
+
+export type CollegeBankAccountDetails = {
+  accountNumber?: string;
+  ifscCode?: string;
+  accountHolderName?: string;
+  bankName?: string;
+  /** Razorpay Route Linked Account ID, e.g. "acc_XXXXXXXXXXXXXX" */
+  linkedAccountId?: string;
+  updatedAt?: string;
+};
+
+/** College / Campus – individual school/college unit. */
 export type College = {
   id: string;
   name: string;
-  /** Unique code: official (DICE/university) or auto-generated for private. */
+  /** Unique College Code: official (DICE/university) or auto-generated for private. Shared with Teachers & Students. */
   code: string;
   createdAt: string;
+  /** Parent Institution ID (linked to System Admin / Institution). */
+  institutionId?: string;
+  /** Parent Institution Code (e.g. INST-XXXX). */
+  institutionCode?: string;
+  /** Parent Institution Name. */
+  institutionName?: string;
   address?: string;
   logoUrl?: string;
   logo2Url?: string;
   status?: 'active' | 'deactivated';
   deactivationReason?: string;
+  biometricSettings?: {
+    enabled: boolean;
+    deviceIp: string;
+    username: string;
+    password?: string;
+    mappedDepartment?: string;
+    updatedAt?: string;
+    lastSyncedAt?: string;
+  };
+  razorpaySettings?: RazorpaySettings;
+  bankAccountDetails?: CollegeBankAccountDetails;
 };
 
 export type Principal = {
@@ -19,6 +55,24 @@ export type Principal = {
   collegeId: string;
   /** Profile picture URL (e.g. from Firebase Storage). */
   photoUrl?: string;
+  /** Parent Institution ID (System Admin). */
+  institutionId?: string;
+  /** Parent Institution Code (e.g. INST-XXXX). */
+  institutionCode?: string;
+};
+
+export type CollegeAdmin = {
+  id: string;
+  name: string;
+  email: string;
+  collegeId?: string;
+  collegeIds?: string[];
+  /** Parent Institution Code owned by this System Admin (e.g. INST-XXXX). */
+  institutionCode?: string;
+  /** Name of the overarching institution / trust / group. */
+  institutionName?: string;
+  photoUrl?: string;
+  razorpaySettings?: RazorpaySettings;
 };
 
 export type Teacher = {
@@ -31,6 +85,20 @@ export type Teacher = {
   photoUrl?: string;
   /** University/seat number or employee ID. */
   usn?: string;
+  /** Employee ID (e.g. EMP-101). */
+  employeeId?: string;
+  /** Unique employee ID registered on the biometric terminal. */
+  biometricId?: string;
+  /** Residential address */
+  address?: string;
+  /** Current Annual CTC in INR */
+  currentCtc?: number;
+  /** Monthly Gross salary in INR */
+  monthlyGross?: number;
+  /** Date of joining */
+  joiningDate?: string;
+  /** Employment type */
+  employmentType?: 'Full-Time' | 'Part-Time' | 'Contract' | 'Visiting';
   /** @deprecated Use subjectIds; kept for backward compat. First subject name. */
   subjectSpecialty?: string;
   /** Subject document IDs this teacher teaches. */
@@ -41,6 +109,34 @@ export type Teacher = {
   roles?: string[];
   /** Academic year batch (e.g. "2025-2026"). Used for year-scoped admin views. */
   academicYear?: string;
+  /** Annual total leaves allotted to teacher (default: 24). */
+  leaveQuota?: number;
+  /** Category-wise leave quotas allotted by Admin (e.g. { "Casual Leave (CL)": 12, "Sick / Medical Leave (SL)": 6, "Earned / Paid Leave (PL)": 6 }). */
+  leaveQuotas?: Record<string, number>;
+  /** Category-wise leaves taken (e.g. { "Casual Leave (CL)": 3, "Sick / Medical Leave (SL)": 1 }). */
+  leavesTaken?: Record<string, number>;
+  /** Department name (e.g. "Computer Science", "Commerce", "Administration", "Accounts") */
+  department?: string;
+  status?: 'active' | 'on-leave' | 'resigned' | 'inactive';
+};
+
+export type Employee = Teacher & {
+  staffType?: 'faculty' | 'clerk' | 'account_manager' | 'asset_manager' | 'admin' | 'staff';
+  userCollection?: string;
+};
+
+export type TeacherLeave = {
+  id: string;
+  teacherId: string;
+  collegeId: string;
+  date: string;
+  type: string; // e.g., 'Casual Leave', 'Sick Leave', 'Duty Leave', or custom type entered by Principal
+  duration: number; // 1.0 for Full Day, 0.5 for Half Day
+  halfDaySession?: 'First Half (Morning)' | 'Second Half (Afternoon)';
+  reason: string;
+  createdAt: string;
+  appliedBy?: string;
+  leaveRequestId?: string;
 };
 
 export type Class = {
@@ -249,6 +345,15 @@ export type LeaveRequest = {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  leaveType?: string;
+  duration?: number;
+  isHalfDay?: boolean;
+  halfDaySession?: 'First Half (Morning)' | 'Second Half (Afternoon)';
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  createdLeaveLogIds?: string[];
 };
 
 /** Message to/from the principal (thread with teacher or student). */
@@ -334,6 +439,7 @@ export interface OMRStudentResult {
   unattemptedCount: number;
   maxScore: number;
   evaluatedAt: string;
-  scannedImage?: string; // Base64 or storage URL of the page image
+  scannedImage?: string; // Original page image
+  parsedAnnotatedImage?: string; // OpenCV Checked/Annotated OMR page image with green/red bubble detections
 }
 

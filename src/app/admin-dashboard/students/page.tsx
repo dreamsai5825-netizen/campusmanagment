@@ -279,6 +279,27 @@ export default function StudentsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow border-dashed bg-muted/20"
+          onClick={() => handleClassClick('unmapped')}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-amber-500" />
+              Unmapped Students
+            </CardTitle>
+            <CardDescription>
+              Newly signed up via code, not assigned to any class
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>{students.filter(s => !s.classId).length} Students</span>
+            </div>
+          </CardContent>
+        </Card>
+
         {classes.map((c) => (
           <Card
             key={c.id}

@@ -15,6 +15,7 @@ import {
   AlertCircle,
   UserPlus,
   Clock,
+  UserCheck,
 } from 'lucide-react';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
 import Link from 'next/link';
@@ -139,7 +140,7 @@ export default function AdminDashboardPage() {
   const handleBackfillCurrentYear = useCallback(async () => {
     setIsBackfilling(true);
     try {
-      const result = await runAcademicYearBackfill(currentAcademicYear);
+      const result = await runAcademicYearBackfill(currentAcademicYear, principal?.collegeId);
       if (result.error) {
         toast({
           variant: 'destructive',
@@ -155,7 +156,7 @@ export default function AdminDashboardPage() {
     } finally {
       setIsBackfilling(false);
     }
-  }, [currentAcademicYear, toast]);
+  }, [currentAcademicYear, principal?.collegeId, toast]);
 
   useEffect(() => {
     if (!principal?.collegeId) {
@@ -283,6 +284,13 @@ export default function AdminDashboardPage() {
       subtitle: `Students in ${selectedAcademicYear}`,
       icon: AlertCircle,
       href: '/admin-dashboard/complaints',
+    },
+    {
+      title: 'Profile & College Settings',
+      value: 'My Profile',
+      subtitle: 'College Code & Institution Link',
+      icon: UserCheck,
+      href: '/admin-dashboard/profile',
     },
   ];
 

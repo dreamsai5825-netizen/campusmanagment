@@ -17,8 +17,10 @@ import {
   GraduationCap,
   Calendar,
   CalendarDays,
+  CalendarOff,
   AlertCircle,
   FileSpreadsheet,
+  Palette,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -49,6 +51,7 @@ const navItems = [
   { href: '/dashboard/attendance', icon: CheckSquare, label: 'Attendance' },
   { href: '/dashboard/timetable', icon: Calendar, label: 'Timetable' },
   { href: '/dashboard/calendar', icon: CalendarDays, label: 'Calendar' },
+  { href: '/dashboard/leaves', icon: CalendarOff, label: 'My Leaves' },
   {
     href: '/dashboard/parent-communication',
     icon: MessageSquare,
@@ -58,6 +61,7 @@ const navItems = [
   { href: '/dashboard/complaints/coordinator', icon: AlertCircle, label: 'Complaints' },
   { href: '/dashboard/omr', icon: FileSpreadsheet, label: 'OMR Sheets' },
   { href: '/dashboard/asset-requests', icon: ClipboardList, label: 'Asset Requests' },
+  { href: '/dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function DashboardLayout({
@@ -101,7 +105,7 @@ export default function DashboardLayout({
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/');
+    router.push('/login');
   };
 
   return (

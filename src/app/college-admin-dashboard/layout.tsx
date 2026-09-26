@@ -22,6 +22,11 @@ import {
   Clock,
   BarChart3,
   ClipboardList,
+  Fingerprint,
+  Palette,
+  Building,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -62,6 +67,8 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import type { Notification, College } from '@/lib/types';
+import { getCollegeById, getCollegesForSystemAdmin, ensureSystemAdminInstitutionCode } from '@/lib/college-service';
+import { useToast } from '@/hooks/use-toast';
 import { playNotificationSound } from '@/lib/notification-sound';
 import { AcademicYearProvider, useAcademicYear } from '@/contexts/academic-year-context';
 import {
@@ -73,6 +80,49 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { AcademicYearBackfill } from '@/components/admin/academic-year-backfill';
+
+function InstitutionCodeHeaderBadge() {
+  const principal = useCurrentPrincipal();
+  const [copied, setCopied] = useState(false);
+  const [instCode, setInstCode] = useState<string>('');
+
+  useEffect(() => {
+    if (!principal?.id) return;
+    const fetchCode = async () => {
+      try {
+        const code = await ensureSystemAdminInstitutionCode(principal.id);
+        if (code) setInstCode(code);
+      } catch (err) {
+        console.error('Error fetching institution code:', err);
+      }
+    };
+    fetchCode();
+  }, [principal?.id]);
+
+  const displayCode = instCode || (principal as any)?.institutionCode;
+  if (!displayCode) return null;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(displayCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-2.5 py-1 rounded-md text-xs font-medium">
+      <Building className="h-3.5 w-3.5" />
+      <span>Inst Code:</span>
+      <span className="font-mono font-bold tracking-wide">{displayCode}</span>
+      <button
+        onClick={handleCopy}
+        title="Copy Institution Code"
+        className="p-1 hover:bg-primary/20 rounded transition text-primary ml-0.5"
+      >
+        {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+      </button>
+    </div>
+  );
+}
 
 function CollegeAdminAcademicYearSelect() {
   const { selectedAcademicYear, setSelectedAcademicYear, availableAcademicYears } =
@@ -135,13 +185,91 @@ function SuperAdminCollegeSelect() {
   );
 }
 
+function CollegeSwitcher() {
+  const principal = useCurrentPrincipal();
+  const [colleges, setColleges] = useState<College[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchColleges = async () => {
+      if (!principal?.id) {
+        setColleges([]);
+        return;
+      }
+      
+      try {
+        const list = await getCollegesForSystemAdmin({
+          systemAdminId: principal.id,
+          institutionCode: (principal as any).institutionCode,
+          collegeIds: principal.collegeIds,
+          currentCollegeId: principal.collegeId,
+        });
+        setColleges(list);
+      } catch (err) {
+        console.error('Error loading switcher colleges:', err);
+      }
+    };
+
+    fetchColleges();
+  }, [principal?.collegeIds, principal?.collegeId, (principal as any)?.institutionCode, principal?.id]);
+
+  if (colleges.length <= 1) return null;
+
+  const handleSwitchCollege = async (targetId: string) => {
+    if (!principal?.id || !principal.userCollection) return;
+    try {
+      const userRef = doc(db, principal.userCollection, principal.id);
+      await updateDoc(userRef, {
+        collegeId: targetId
+      });
+      toast({
+        title: 'College Switched',
+        description: `Switched context to ${colleges.find(c => c.id === targetId)?.name || 'selected college'}.`
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: 'destructive',
+        title: 'Switch failed',
+        description: 'Failed to change the active college.'
+      });
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Label htmlFor="dashboard-college-select" className="sr-only">
+        Active College
+      </Label>
+      <Select
+        value={principal?.collegeId || ''}
+        onValueChange={handleSwitchCollege}
+      >
+        <SelectTrigger id="dashboard-college-select" className="w-[180px] sm:w-[220px] bg-background text-foreground border shadow-sm">
+          <SelectValue placeholder="Select College" />
+        </SelectTrigger>
+        <SelectContent side="bottom" className="max-h-48 overflow-y-auto">
+          {colleges.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 const navItems = [
   { href: '/college-admin-dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/college-admin-dashboard/employees', icon: Users, label: 'Employee Management' },
   { href: '/college-admin-dashboard/faculty-activity', icon: ClipboardList, label: 'Faculty Activity' },
   { href: '/college-admin-dashboard/leaves', icon: Calendar, label: 'Leave Requests' },
   { href: '/college-admin-dashboard/asset-requests', icon: ClipboardList, label: 'Asset Requests' },
   { href: '/college-admin-dashboard/communication', icon: MessageSquare, label: 'Communication' },
   { href: '/college-admin-dashboard/reports', icon: BarChart3, label: 'Reports' },
+  { href: '/college-admin-dashboard/biometrics', icon: Fingerprint, label: 'Biometrics' },
+  { href: '/college-admin-dashboard/theme', icon: Palette, label: 'Theme Settings' },
 ];
 
 export default function CollegeAdminDashboardLayout({
@@ -193,6 +321,10 @@ export default function CollegeAdminDashboardLayout({
         const data = snap.data();
         setCollegeStatus(data.status || 'active');
         setDeactivationReason(data.deactivationReason || '');
+
+        if (!data.code || data.code === '-' || data.code === '—' || String(data.code).trim() === '') {
+          getCollegeById(principal.collegeId);
+        }
         
         const billing = data.billing;
         if (billing && billing.expiryDate) {
@@ -395,29 +527,30 @@ export default function CollegeAdminDashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href}>
-                  <SidebarMenuButton
-                    isActive={
-                      pathname.startsWith(item.href) &&
-                      (pathname.length === item.href.length ||
-                        pathname[item.href.length] === '/')
-                    }
-                    className={cn(
-                      'justify-start gap-3',
-                      pathname.startsWith(item.href) &&
-                        (pathname.length === item.href.length ||
-                          pathname[item.href.length] === '/') &&
-                        'font-bold'
-                    )}
-                  >
-                    <item.icon className="size-5" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
+            {navItems.map((item) => {
+              const isItemActive = item.href === '/college-admin-dashboard'
+                ? pathname === '/college-admin-dashboard'
+                : (pathname.startsWith(item.href) &&
+                    (pathname.length === item.href.length ||
+                      pathname[item.href.length] === '/'));
+
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <Link href={item.href}>
+                    <SidebarMenuButton
+                      isActive={isItemActive}
+                      className={cn(
+                        'justify-start gap-3',
+                        isItemActive && 'font-bold'
+                      )}
+                    >
+                      <item.icon className="size-5" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </Link>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border">
@@ -471,7 +604,7 @@ export default function CollegeAdminDashboardLayout({
               </Link>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/'); }}>
+              <SidebarMenuButton className="justify-start gap-3 w-full cursor-pointer" onClick={async () => { await signOut(); router.push('/login'); }}>
                 <LogOut className="size-5" />
                 <span>Logout</span>
               </SidebarMenuButton>
@@ -492,7 +625,12 @@ export default function CollegeAdminDashboardLayout({
           </div>
           <div className="hidden md:block" />
           <div className="flex items-center gap-2">
-            {principal?.isSuperAdmin && <SuperAdminCollegeSelect />}
+            <InstitutionCodeHeaderBadge />
+            {principal?.isSuperAdmin ? (
+              <SuperAdminCollegeSelect />
+            ) : (
+              <CollegeSwitcher />
+            )}
             <CollegeAdminAcademicYearSelect />
             {NotificationPopover}
           </div>

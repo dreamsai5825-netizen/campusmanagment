@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, writeBatc
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useCurrentPrincipal } from '@/hooks/use-current-user';
+import { useChatScroll } from '@/hooks/use-chat-scroll';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,7 +55,6 @@ export default function CollegeAdminCommunicationPage() {
   // File attachments state
   const [fileToSend, setFileToSend] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
   const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch teachers and principals in the college
@@ -110,13 +110,6 @@ export default function CollegeAdminCommunicationPage() {
     return () => unsub();
   }, [admin?.collegeId, admin?.id]);
 
-  // Scroll to bottom when conversation changes or messages arrive
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [messages, selectedParticipant]);
-
   // Thread filter
   const threadMessages = React.useMemo(() => {
     if (!selectedParticipant || !admin?.id) return [];
@@ -126,6 +119,9 @@ export default function CollegeAdminCommunicationPage() {
         (m.fromId === selectedParticipant.id && m.toId === admin.id)
     );
   }, [messages, selectedParticipant, admin?.id]);
+
+  // Scroll to bottom when conversation changes or messages arrive
+  const { ref: chatScrollRef } = useChatScroll([threadMessages, selectedParticipant?.id]);
 
   // Mark unread messages as read
   useEffect(() => {

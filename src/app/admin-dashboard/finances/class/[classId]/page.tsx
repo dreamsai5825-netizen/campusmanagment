@@ -112,7 +112,14 @@ export default function ClassFeeBookPage() {
 
   useEffect(() => {
     if (!principal?.collegeId || !classId) return;
-    getCollegeById(principal.collegeId).then(setCollege);
+    const unsubCollege = onSnapshot(
+      doc(db, 'colleges', principal.collegeId),
+      (snap) => {
+        if (snap.exists()) {
+          setCollege({ id: snap.id, ...snap.data() } as College);
+        }
+      }
+    );
     const unsubClass = onSnapshot(
       query(collection(db, 'classes'), where('collegeId', '==', principal.collegeId)),
       (snap) => {
@@ -132,6 +139,7 @@ export default function ClassFeeBookPage() {
         setAllStudents(snap.docs.map((d) => ({ ...d.data(), id: d.id } as Student)))
     );
     return () => {
+      unsubCollege();
       unsubClass();
       unsubStudents();
     };
@@ -176,38 +184,57 @@ export default function ClassFeeBookPage() {
     );
   }, [students]);
 
+  // Periodic collection stats
   const collectionStats = useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const weekStart = todayStart - 7 * 24 * 60 * 60 * 1000;
     const monthStart = todayStart - 30 * 24 * 60 * 60 * 1000;
+
     const stats = {
-      today: { amount: 0, count: 0 },
-      week: { amount: 0, count: 0 },
-      month: { amount: 0, count: 0 },
+      today: { amount: 0, total: 0, count: 0, payments: [] as Array<{ student: Student; payment: FeePaymentRecord }> },
+      week: { amount: 0, total: 0, count: 0, payments: [] as Array<{ student: Student; payment: FeePaymentRecord }> },
+      month: { amount: 0, total: 0, count: 0, payments: [] as Array<{ student: Student; payment: FeePaymentRecord }> },
     };
+
     students.forEach((s) => {
       (s.fees?.paymentHistory ?? []).forEach((p) => {
         const t = new Date(p.date).getTime();
-        stats.month.amount += p.amount;
-        stats.month.count += 1;
-        if (t >= weekStart) {
-          stats.week.amount += p.amount;
-          stats.week.count += 1;
-        }
         if (t >= todayStart) {
           stats.today.amount += p.amount;
+          stats.today.total += p.amount;
           stats.today.count += 1;
+          stats.today.payments.push({ student: s, payment: p });
+        }
+        if (t >= weekStart) {
+          stats.week.amount += p.amount;
+          stats.week.total += p.amount;
+          stats.week.count += 1;
+          stats.week.payments.push({ student: s, payment: p });
+        }
+        if (t >= monthStart) {
+          stats.month.amount += p.amount;
+          stats.month.total += p.amount;
+          stats.month.count += 1;
+          stats.month.payments.push({ student: s, payment: p });
         }
       });
     });
+    // Sort latest payments first
+    stats.today.payments.sort((a, b) => new Date(b.payment.date).getTime() - new Date(a.payment.date).getTime());
+    stats.week.payments.sort((a, b) => new Date(b.payment.date).getTime() - new Date(a.payment.date).getTime());
+    stats.month.payments.sort((a, b) => new Date(b.payment.date).getTime() - new Date(a.payment.date).getTime());
+
     return stats;
   }, [students]);
 
   const receiptCollege = useMemo(
     () => ({
-      name: college?.name ?? 'CMS Portal',
+      name: college?.name || 'Institution',
       code: college?.code,
+      logoUrl: college?.logoUrl,
+      logo2Url: college?.logo2Url,
+      address: college?.address,
     }),
     [college]
   );
@@ -421,50 +448,76 @@ export default function ClassFeeBookPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-green-200 bg-green-50/40">
+        <Card
+          className="border-green-200 bg-green-50/40 cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] hover:border-green-400 group"
+          onClick={() => router.push(getPath(`/finances/class/${classId}/collections?period=today`))}
+        >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-green-800 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Today&apos;s Collection
+            <CardTitle className="text-sm text-green-800 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-green-600" />
+                Today&apos;s Collection
+              </span>
+              <span className="text-[10px] font-semibold bg-green-200/60 text-green-800 px-2 py-0.5 rounded-full group-hover:bg-green-600 group-hover:text-white transition-all">
+                View Report →
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-700">
               {formatInr(collectionStats.today.amount)}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {collectionStats.today.count} payment(s)
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+              <span>{collectionStats.today.count} payment(s)</span>
             </p>
           </CardContent>
         </Card>
-        <Card className="border-blue-200 bg-blue-50/40">
+
+        <Card
+          className="border-blue-200 bg-blue-50/40 cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] hover:border-blue-400 group"
+          onClick={() => router.push(getPath(`/finances/class/${classId}/collections?period=week`))}
+        >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-blue-800 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              This Week
+            <CardTitle className="text-sm text-blue-800 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                This Week
+              </span>
+              <span className="text-[10px] font-semibold bg-blue-200/60 text-blue-800 px-2 py-0.5 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-all">
+                View Report →
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-blue-700">
               {formatInr(collectionStats.week.amount)}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               {collectionStats.week.count} payment(s) · last 7 days
             </p>
           </CardContent>
         </Card>
-        <Card className="border-purple-200 bg-purple-50/40">
+
+        <Card
+          className="border-purple-200 bg-purple-50/40 cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] hover:border-purple-400 group"
+          onClick={() => router.push(getPath(`/finances/class/${classId}/collections?period=month`))}
+        >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-purple-800 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              This Month
+            <CardTitle className="text-sm text-purple-800 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-purple-600" />
+                This Month
+              </span>
+              <span className="text-[10px] font-semibold bg-purple-200/60 text-purple-800 px-2 py-0.5 rounded-full group-hover:bg-purple-600 group-hover:text-white transition-all">
+                View Report →
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-purple-700">
               {formatInr(collectionStats.month.amount)}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               {collectionStats.month.count} payment(s) · last 30 days
             </p>
           </CardContent>
@@ -838,7 +891,6 @@ export default function ClassFeeBookPage() {
               </Card>
             </div>
           )}
-
           <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => setProfileStudent(null)}>
               Close
